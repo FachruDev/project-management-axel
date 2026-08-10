@@ -1,5 +1,6 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    calculateProjects as calculateProjectsAction,
     destroy,
     edit,
     index,
@@ -7,6 +8,7 @@ import {
     updateStatus,
 } from '@/actions/App/Http/Controllers/IncentiveProfileController';
 import type {
+    IncentiveCalculationSummary,
     IncentiveProfileDetail,
     IncentiveProfileStatus,
     StatusOption,
@@ -25,6 +27,13 @@ const statusClasses: Record<IncentiveProfileStatus, string> = {
 };
 
 export default function IncentiveProfileShow({ profile }: Props) {
+    const flash = usePage().props.flash as
+        | {
+              success?: string | null;
+              calculation_summary?: IncentiveCalculationSummary | null;
+          }
+        | undefined;
+
     function changeStatus(status: IncentiveProfileStatus) {
         router.patch(updateStatus.url(profile.id), {
             status,
@@ -41,6 +50,10 @@ export default function IncentiveProfileShow({ profile }: Props) {
         }
 
         router.delete(destroy.url(profile.id));
+    }
+
+    function calculateProjects() {
+        router.post(calculateProjectsAction.url(profile.id));
     }
 
     return (
@@ -115,6 +128,15 @@ export default function IncentiveProfileShow({ profile }: Props) {
                                     New Version
                                 </button>
                             )}
+                            {profile.actions.can_calculate && (
+                                <button
+                                    type="button"
+                                    onClick={calculateProjects}
+                                    className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+                                >
+                                    Calculate Projects
+                                </button>
+                            )}
                             {profile.actions.can_delete && (
                                 <button
                                     type="button"
@@ -126,6 +148,20 @@ export default function IncentiveProfileShow({ profile }: Props) {
                             )}
                         </div>
                     </header>
+
+                    {flash?.success && (
+                        <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                            <div className="font-medium">{flash.success}</div>
+                            {flash.calculation_summary && (
+                                <div className="mt-2 text-emerald-800">
+                                    Calculated{' '}
+                                    {flash.calculation_summary.calculated}{' '}
+                                    project, skipped{' '}
+                                    {flash.calculation_summary.skipped}.
+                                </div>
+                            )}
+                        </section>
+                    )}
 
                     <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         <Metric

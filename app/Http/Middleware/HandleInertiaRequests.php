@@ -54,6 +54,10 @@ class HandleInertiaRequests extends Middleware
             'embed' => [
                 'prefix' => $request->headers->get('X-Portal-Embed-Prefix', ''),
             ],
+            'flash' => [
+                'success' => fn (): mixed => $request->session()->get('success'),
+                'calculation_summary' => fn (): mixed => $request->session()->get('calculation_summary'),
+            ],
         ];
     }
 }

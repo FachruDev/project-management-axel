@@ -13,6 +13,7 @@ export type IncentiveProfileActions = {
     can_inactivate: boolean;
     can_archive: boolean;
     can_version: boolean;
+    can_calculate: boolean;
 };
 
 export type RuleCounts = {
@@ -114,4 +115,18 @@ export type Paginated<T> = {
         to: number | null;
         total: number;
     };
+};
+
+export type IncentiveCalculationSummary = {
+    profile_id: number;
+    calculated: number;
+    skipped: number;
+    calculated_projects: Array<{
+        project_id: number;
+        calculation_id: number;
+    }>;
+    skipped_projects: Array<{
+        project_id: number;
+        reason: string;
+    }>;
 };

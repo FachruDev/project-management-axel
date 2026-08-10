@@ -1,4 +1,5 @@
 import type { Auth } from '@/types/auth';
+import type { IncentiveCalculationSummary } from '@/types/incentive-profile';
 
 declare module 'react' {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -14,6 +15,10 @@ declare module '@inertiajs/core' {
             auth: Auth;
             embed: {
                 prefix: string;
+            };
+            flash: {
+                success: string | null;
+                calculation_summary: IncentiveCalculationSummary | null;
             };
             sidebarOpen: boolean;
             [key: string]: unknown;

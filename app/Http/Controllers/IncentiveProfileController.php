@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateIncentiveProfileRequest;
 use App\Http\Requests\UpdateIncentiveProfileStatusRequest;
 use App\Models\IncentiveProfile;
 use App\Models\User;
+use App\Services\Incentives\IncentiveProfileBatchCalculator;
 use App\Services\Incentives\IncentiveProfileService;
 use DateTimeInterface;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +21,7 @@ class IncentiveProfileController extends Controller
 {
     public function __construct(
         private readonly IncentiveProfileService $service,
+        private readonly IncentiveProfileBatchCalculator $batchCalculator,
     ) {}
 
     public function index(Request $request): Response
@@ -132,6 +134,20 @@ class IncentiveProfileController extends Controller
             ->with('success', 'New incentive profile version created.');
     }
 
+    public function calculateProjects(IncentiveProfile $incentiveProfile): RedirectResponse
+    {
+        $summary = $this->batchCalculator->calculateForProfile($incentiveProfile);
+
+        return redirect()
+            ->route('incentive-profiles.show', $incentiveProfile)
+            ->with('success', sprintf(
+                'Incentive calculation finished: %d calculated, %d skipped.',
+                $summary['calculated'],
+                $summary['skipped'],
+            ))
+            ->with('calculation_summary', $summary);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -233,6 +249,7 @@ class IncentiveProfileController extends Controller
                 'can_inactivate' => false,
                 'can_archive' => false,
                 'can_version' => false,
+                'can_calculate' => false,
             ],
         ];
     }
@@ -257,6 +274,8 @@ class IncentiveProfileController extends Controller
     {
         $usageCount = (int) ($profile->getAttribute('projects_count') ?? 0)
             + (int) ($profile->getAttribute('incentive_calculations_count') ?? 0);
+        $user = request()->user();
+        $canCalculate = $user instanceof User && $user->can('calculate_project_incentives');
 
         return [
             'can_edit' => $profile->isEditable(),
@@ -265,6 +284,7 @@ class IncentiveProfileController extends Controller
             'can_inactivate' => $profile->isActive(),
             'can_archive' => in_array($profile->currentStatus(), [IncentiveProfileStatus::Draft, IncentiveProfileStatus::Inactive], true),
             'can_version' => $profile->currentStatus() !== IncentiveProfileStatus::Draft,
+            'can_calculate' => $profile->currentStatus() === IncentiveProfileStatus::Active && $canCalculate,
         ];
     }
 
