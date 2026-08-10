@@ -15,7 +15,7 @@ class IncentiveProjectRoleRuleFactory extends Factory
     {
         return [
             'incentive_profile_id' => IncentiveProfile::factory(),
-            'role_code' => fake()->unique()->randomElement(['pm', 'production', 'support']).fake()->unique()->numberBetween(1, 999),
+            'role_code' => fake()->randomElement(['pm', 'production', 'support']).fake()->unique()->numberBetween(1, 999999),
             'role_name' => fake()->jobTitle(),
             'points' => fake()->numberBetween(0, 3),
             'is_support' => false,

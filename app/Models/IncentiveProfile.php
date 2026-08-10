@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\IncentiveProfileStatus;
 use Database\Factories\IncentiveProfileFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -91,5 +92,53 @@ class IncentiveProfile extends Model
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class);
+    }
+
+    public function currentStatus(): IncentiveProfileStatus
+    {
+        $status = $this->getAttribute('status');
+
+        if ($status instanceof IncentiveProfileStatus) {
+            return $status;
+        }
+
+        return IncentiveProfileStatus::from($status);
+    }
+
+    public function isEditable(): bool
+    {
+        return in_array($this->currentStatus(), [IncentiveProfileStatus::Draft, IncentiveProfileStatus::Inactive], true);
+    }
+
+    public function isActive(): bool
+    {
+        return $this->currentStatus() === IncentiveProfileStatus::Active;
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->currentStatus() === IncentiveProfileStatus::Archived;
+    }
+
+    public function hasUsage(): bool
+    {
+        return $this->projects()->exists() || $this->incentiveCalculations()->exists();
+    }
+
+    /**
+     * @return HasMany<ProjectIncentiveCalculation, $this>
+     */
+    public function incentiveCalculations(): HasMany
+    {
+        return $this->hasMany(ProjectIncentiveCalculation::class);
+    }
+
+    /**
+     * @param  Builder<IncentiveProfile>  $query
+     * @return Builder<IncentiveProfile>
+     */
+    public function scopeWithStatus(Builder $query, IncentiveProfileStatus $status): Builder
+    {
+        return $query->where('status', $status->value);
     }
 }

@@ -14,7 +14,7 @@ class IncentiveProfileFactory extends Factory
 {
     public function definition(): array
     {
-        $name = 'Incentive '.fake()->unique()->year();
+        $name = 'Incentive '.fake()->unique()->numberBetween(1000, 999999);
 
         return [
             'code' => Str::upper(Str::slug($name, '_')),

@@ -15,7 +15,7 @@ class IncentivePicLevelRuleFactory extends Factory
     {
         return [
             'incentive_profile_id' => IncentiveProfile::factory(),
-            'level_code' => fake()->unique()->randomElement(['manager', 'section', 'spv', 'officer']).fake()->unique()->numberBetween(1, 999),
+            'level_code' => fake()->randomElement(['manager', 'section', 'spv', 'officer']).fake()->unique()->numberBetween(1, 999999),
             'level_name' => fake()->jobTitle(),
             'points' => fake()->numberBetween(1, 5),
         ];
