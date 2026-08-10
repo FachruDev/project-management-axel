@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import type { FormEvent, ReactNode } from 'react';
 import {
     index,
@@ -6,6 +6,8 @@ import {
     store,
     update,
 } from '@/actions/App/Http/Controllers/IncentiveProfileController';
+import { PageHeader } from '@/components/page-header';
+import { AppLayout } from '@/layouts/app-layout';
 import type {
     DeliveryRule,
     IncentiveProfileActions,
@@ -35,6 +37,7 @@ const inputClass =
 export default function IncentiveProfileForm({ mode, profile }: Props) {
     const isEdit = mode === 'edit';
     const isLocked = isEdit && !profile.actions.can_edit;
+    const pageTitle = isEdit ? 'Edit Incentive Profile' : 'New Incentive Profile';
     const form = useForm<IncentiveProfileFormPayload>({
         code: profile.code,
         name: profile.name,
@@ -66,42 +69,29 @@ export default function IncentiveProfileForm({ mode, profile }: Props) {
     }
 
     return (
-        <>
-            <Head
-                title={
-                    isEdit ? `Edit ${profile.name}` : 'New Incentive Profile'
+        <AppLayout title={pageTitle}>
+            <PageHeader
+                eyebrow="Master Data"
+                title={pageTitle}
+                actions={
+                    <>
+                        <Link
+                            href={index.url()}
+                            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-white"
+                        >
+                            Back
+                        </Link>
+                        {isEdit && profile.id !== null && (
+                            <Link
+                                href={show.url(profile.id)}
+                                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-white"
+                            >
+                                View
+                            </Link>
+                        )}
+                    </>
                 }
             />
-            <main className="min-h-screen bg-zinc-100 text-zinc-950">
-                <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-                    <header className="flex flex-col gap-4 border-b border-zinc-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-zinc-500">
-                                Master Data
-                            </p>
-                            <h1 className="text-2xl font-semibold">
-                                {isEdit
-                                    ? 'Edit Incentive Profile'
-                                    : 'New Incentive Profile'}
-                            </h1>
-                        </div>
-                        <div className="flex gap-2">
-                            <Link
-                                href={index.url()}
-                                className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium hover:bg-white"
-                            >
-                                Back
-                            </Link>
-                            {isEdit && profile.id !== null && (
-                                <Link
-                                    href={show.url(profile.id)}
-                                    className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium hover:bg-white"
-                                >
-                                    View
-                                </Link>
-                            )}
-                        </div>
-                    </header>
 
                     {isLocked && (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -310,9 +300,7 @@ export default function IncentiveProfileForm({ mode, profile }: Props) {
                             </button>
                         </div>
                     </form>
-                </div>
-            </main>
-        </>
+        </AppLayout>
     );
 }
 

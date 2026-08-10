@@ -1,6 +1,10 @@
 <?php
 
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\IncentiveProfileController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('portal.auth')->group(function (): void {
@@ -17,4 +21,20 @@ Route::middleware('portal.auth')->group(function (): void {
             ->name('incentive-profiles.versions.store');
         Route::resource('incentive-profiles', IncentiveProfileController::class);
     });
+
+    Route::resource('customers', CustomerController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('can:manage_customers');
+
+    Route::resource('departments', DepartmentController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('can:manage_departments');
+
+    Route::resource('users', UserController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('can:manage_users');
+
+    Route::resource('roles', RoleController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('can:manage_roles');
 });

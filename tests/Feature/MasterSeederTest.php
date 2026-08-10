@@ -43,6 +43,8 @@ class MasterSeederTest extends TestCase
         $this->assertTrue($user->hasRole('super_admin'));
         $this->assertTrue($user->can('manage_incentive_profiles'));
         $this->assertTrue($user->can('calculate_project_incentives'));
+        $this->assertTrue($user->can('manage_users'));
+        $this->assertTrue($user->can('manage_roles'));
         $this->assertSame('incentive', $calculatePermission->getAttribute('category'));
         $this->assertNotNull($user->department_id);
         $this->assertGreaterThanOrEqual(5, Department::count());

@@ -1,4 +1,4 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     calculateProjects as calculateProjectsAction,
     destroy,
@@ -7,6 +7,8 @@ import {
     storeVersion,
     updateStatus,
 } from '@/actions/App/Http/Controllers/IncentiveProfileController';
+import { PageHeader } from '@/components/page-header';
+import { AppLayout } from '@/layouts/app-layout';
 import type {
     IncentiveCalculationSummary,
     IncentiveProfileDetail,
@@ -57,37 +59,22 @@ export default function IncentiveProfileShow({ profile }: Props) {
     }
 
     return (
-        <>
-            <Head title={profile.name} />
-            <main className="min-h-screen bg-zinc-100 text-zinc-950">
-                <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-                    <header className="flex flex-col gap-4 border-b border-zinc-200 pb-5 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-zinc-500">
-                                {profile.code} / v{profile.version}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-3">
-                                <h1 className="text-2xl font-semibold">
-                                    {profile.name}
-                                </h1>
-                                <span
-                                    className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${statusClasses[profile.status]}`}
-                                >
-                                    {profile.status}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
+        <AppLayout title={profile.name}>
+            <PageHeader
+                eyebrow={`${profile.code} / v${profile.version}`}
+                title={profile.name}
+                actions={
+                    <>
                             <Link
                                 href={index.url()}
-                                className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium hover:bg-white"
+                                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-white"
                             >
                                 Back
                             </Link>
                             {profile.actions.can_edit && (
                                 <Link
                                     href={edit.url(profile.id)}
-                                    className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium hover:bg-white"
+                                    className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-white"
                                 >
                                     Edit
                                 </Link>
@@ -114,7 +101,7 @@ export default function IncentiveProfileShow({ profile }: Props) {
                                 <button
                                     type="button"
                                     onClick={() => changeStatus('archived')}
-                                    className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium hover:bg-white"
+                                    className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-white"
                                 >
                                     Archive
                                 </button>
@@ -123,7 +110,7 @@ export default function IncentiveProfileShow({ profile }: Props) {
                                 <button
                                     type="button"
                                     onClick={createVersion}
-                                    className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium hover:bg-white"
+                                    className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-white"
                                 >
                                     New Version
                                 </button>
@@ -146,8 +133,17 @@ export default function IncentiveProfileShow({ profile }: Props) {
                                     Delete
                                 </button>
                             )}
-                        </div>
-                    </header>
+                    </>
+                }
+            />
+
+                    <div>
+                        <span
+                            className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${statusClasses[profile.status]}`}
+                        >
+                            {profile.status}
+                        </span>
+                    </div>
 
                     {flash?.success && (
                         <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
@@ -226,9 +222,7 @@ export default function IncentiveProfileShow({ profile }: Props) {
                             rule.multiplier,
                         ])}
                     />
-                </div>
-            </main>
-        </>
+        </AppLayout>
     );
 }
 

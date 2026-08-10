@@ -29,6 +29,10 @@ class PermissionSeeder extends Seeder
                 'manage_departments',
                 'manage_customers',
             ],
+            'administration' => [
+                'manage_users',
+                'manage_roles',
+            ],
         ];
 
         foreach ($permissions as $category => $names) {
