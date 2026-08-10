@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\AttachmentCollection;
 use App\Enums\ProjectStatus;
+use App\Enums\TaskStatus;
 use Database\Factories\ProjectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -161,5 +164,50 @@ class Project extends Model
     public function incentiveCalculations(): HasMany
     {
         return $this->hasMany(ProjectIncentiveCalculation::class);
+    }
+
+    public function hasAttachment(AttachmentCollection $collection): bool
+    {
+        return $this->attachments()
+            ->where('collection', $collection->value)
+            ->exists();
+    }
+
+    public function hasCustomers(): bool
+    {
+        return $this->customers()->exists();
+    }
+
+    public function hasMembers(): bool
+    {
+        return $this->members()->exists();
+    }
+
+    public function allTasksDone(): bool
+    {
+        return $this->tasks()->exists()
+            && $this->tasks()
+                ->where('status', '!=', TaskStatus::Done->value)
+                ->doesntExist();
+    }
+
+    public function currentStatus(): ProjectStatus
+    {
+        $status = $this->getAttribute('status');
+
+        if ($status instanceof ProjectStatus) {
+            return $status;
+        }
+
+        return ProjectStatus::from($status);
+    }
+
+    /**
+     * @param  Builder<Project>  $query
+     * @return Builder<Project>
+     */
+    public function scopeWithStatus(Builder $query, ProjectStatus $status): Builder
+    {
+        return $query->where('status', $status->value);
     }
 }
