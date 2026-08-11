@@ -608,11 +608,6 @@ function DeliveryRules({
             }
             disabled={disabled}
         >
-            <p className="rounded-lg border border-blue-100 bg-pastel-blue px-3 py-2 text-xs text-primary">
-                Contoh aman: early min kosong max -1, on-time 0 sampai 0,
-                late 1 sampai 30, very late 31 sampai kosong dengan multiplier
-                0. Range tidak boleh saling menabrak.
-            </p>
             {rules.map((rule, indexKey) => (
                 <div
                     key={indexKey}

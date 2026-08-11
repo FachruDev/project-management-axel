@@ -5,11 +5,13 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\Department;
 use App\Models\Holiday;
+use App\Models\IncentiveProfile;
 use App\Models\User;
 use App\Models\WorkingDayRule;
 use Database\Seeders\CustomerSeeder;
 use Database\Seeders\DepartmentSeeder;
 use Database\Seeders\HolidaySeeder;
+use Database\Seeders\IncentiveProfileSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\UserSeeder;
@@ -32,6 +34,7 @@ class MasterSeederTest extends TestCase
             RoleSeeder::class,
             UserSeeder::class,
             CustomerSeeder::class,
+            IncentiveProfileSeeder::class,
             WorkingDayRuleSeeder::class,
             HolidaySeeder::class,
         ]);
@@ -72,5 +75,16 @@ class MasterSeederTest extends TestCase
         $this->assertSame(7, WorkingDayRule::count());
         $this->assertFalse(WorkingDayRule::query()->where('day_of_week', 7)->firstOrFail()->is_working);
         $this->assertGreaterThanOrEqual(1, Holiday::count());
+
+        $profile = IncentiveProfile::query()
+            ->where('code', 'PROJECT_MONITORING')
+            ->firstOrFail();
+
+        $this->assertSame('0.1000', $profile->support_percent);
+        $this->assertSame('active', $profile->status->value);
+        $this->assertSame(4, $profile->mandayRules()->count());
+        $this->assertSame(4, $profile->picLevelRules()->count());
+        $this->assertSame(3, $profile->projectRoleRules()->count());
+        $this->assertSame(4, $profile->deliveryRules()->count());
     }
 }

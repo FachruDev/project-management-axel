@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             UserSeeder::class,
             CustomerSeeder::class,
+            IncentiveProfileSeeder::class,
             WorkingDayRuleSeeder::class,
             HolidaySeeder::class,
         ]);
