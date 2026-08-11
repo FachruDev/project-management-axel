@@ -8,6 +8,8 @@ use Illuminate\Validation\Validator;
 
 trait ValidatesIncentiveProfilePayload
 {
+    use NormalizesNumericInput;
+
     protected function prepareForValidation(): void
     {
         if (! $this->has('code')) {
@@ -16,6 +18,11 @@ trait ValidatesIncentiveProfilePayload
 
         $this->merge([
             'code' => str($this->input('code'))->trim()->upper()->toString(),
+            'support_percent' => $this->normalizePercentInput($this->input('support_percent')),
+            'manday_rules' => $this->normalizeMandayRuleInputs($this->ruleRows('manday_rules')),
+            'pic_level_rules' => $this->normalizePicLevelRuleInputs($this->ruleRows('pic_level_rules')),
+            'project_role_rules' => $this->normalizeProjectRoleRuleInputs($this->ruleRows('project_role_rules')),
+            'delivery_rules' => $this->normalizeDeliveryRuleInputs($this->ruleRows('delivery_rules')),
         ]);
     }
 
@@ -178,5 +185,66 @@ trait ValidatesIncentiveProfilePayload
         }
 
         return array_values(array_filter($value, is_array(...)));
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rules
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeMandayRuleInputs(array $rules): array
+    {
+        return array_map(fn (array $rule): array => [
+            ...$rule,
+            'min_mandays' => $this->normalizeNullableIntegerBound($rule['min_mandays'] ?? null),
+            'max_mandays' => $this->normalizeNullableIntegerBound($rule['max_mandays'] ?? null, zeroIsOpenEnded: true),
+            'base_score' => $this->normalizeDecimalInput($rule['base_score'] ?? null),
+        ], $rules);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rules
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizePicLevelRuleInputs(array $rules): array
+    {
+        return array_map(fn (array $rule): array => [
+            ...$rule,
+            'points' => $this->normalizeDecimalInput($rule['points'] ?? null),
+        ], $rules);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rules
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeProjectRoleRuleInputs(array $rules): array
+    {
+        return array_map(fn (array $rule): array => [
+            ...$rule,
+            'points' => $this->normalizeDecimalInput($rule['points'] ?? null),
+        ], $rules);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rules
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeDeliveryRuleInputs(array $rules): array
+    {
+        return array_map(function (array $rule): array {
+            $min = $this->normalizeNullableIntegerBound($rule['min_difference_days'] ?? null);
+            $max = $this->normalizeNullableIntegerBound($rule['max_difference_days'] ?? null);
+
+            if ($min === '0' && is_numeric($max) && (int) $max < 0) {
+                $min = null;
+            }
+
+            return [
+                ...$rule,
+                'min_difference_days' => $min,
+                'max_difference_days' => $max,
+                'multiplier' => $this->normalizeDecimalInput($rule['multiplier'] ?? null),
+            ];
+        }, $rules);
     }
 }

@@ -64,6 +64,7 @@ export default function ProjectPreparationIndex({
     const [status, setStatus] = useState(filters.status);
     const [editing, setEditing] = useState<ProjectSummary | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
+    const [customerSearch, setCustomerSearch] = useState('');
     const flash = usePage().props.flash as { success?: string | null } | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
     const form = useForm<ProjectPayload>(blankProject);
@@ -85,6 +86,7 @@ export default function ProjectPreparationIndex({
         setEditing(null);
         form.clearErrors();
         form.setData(blankProject);
+        setCustomerSearch('');
         setModalOpen(true);
     }
 
@@ -103,6 +105,7 @@ export default function ProjectPreparationIndex({
             mandays: project.mandays,
             incentive_profile_id: String(project.incentive_profile?.id ?? ''),
         });
+        setCustomerSearch('');
         setModalOpen(true);
     }
 
@@ -298,14 +301,14 @@ export default function ProjectPreparationIndex({
                 onClose={() => setModalOpen(false)}
             >
                 <form onSubmit={submitForm} className="flex flex-col gap-4">
-                    <Field label="Project Name" error={form.errors.name}>
+                    <Field label="Project Name" error={form.errors.name} required>
                         <input
                             value={form.data.name}
                             onChange={(event) => form.setData('name', event.target.value)}
                             className={inputClass}
                         />
                     </Field>
-                    <Field label="Project Date" error={form.errors.project_date}>
+                    <Field label="Project Date" error={form.errors.project_date} required>
                         <input
                             type="date"
                             value={form.data.project_date}
@@ -315,27 +318,20 @@ export default function ProjectPreparationIndex({
                             className={inputClass}
                         />
                     </Field>
-                    <Field label="Customers" error={form.errors.customer_ids}>
-                        <div className="max-h-40 overflow-y-auto rounded-md border border-slate-200 p-2">
-                            {options.customers.map((customer) => (
-                                <label
-                                    key={customer.id}
-                                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-50"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={form.data.customer_ids.includes(String(customer.id))}
-                                        onChange={() => toggleCustomer(customer)}
-                                    />
-                                    {customer.name}
-                                </label>
-                            ))}
-                        </div>
+                    <Field label="Customers" error={form.errors.customer_ids} required>
+                        <CustomerMultiSelect
+                            customers={options.customers}
+                            selectedIds={form.data.customer_ids}
+                            search={customerSearch}
+                            onSearchChange={setCustomerSearch}
+                            onToggle={toggleCustomer}
+                        />
                     </Field>
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Mandays" error={form.errors.mandays}>
+                        <Field label="Mandays" error={form.errors.mandays} required>
                             <input
-                                type="number"
+                                type="text"
+                                inputMode="decimal"
                                 min="0.01"
                                 step="0.01"
                                 value={form.data.mandays}
@@ -348,6 +344,7 @@ export default function ProjectPreparationIndex({
                         <Field
                             label="Incentive Profile"
                             error={form.errors.incentive_profile_id}
+                            required
                         >
                             <select
                                 value={form.data.incentive_profile_id}
@@ -397,18 +394,109 @@ function EmptyLane({ children }: { children: ReactNode }) {
     );
 }
 
+function CustomerMultiSelect({
+    customers,
+    selectedIds,
+    search,
+    onSearchChange,
+    onToggle,
+}: {
+    customers: CustomerProjectOption[];
+    selectedIds: string[];
+    search: string;
+    onSearchChange: (search: string) => void;
+    onToggle: (customer: CustomerProjectOption) => void;
+}) {
+    const query = search.trim().toLowerCase();
+    const selectedCustomers = customers.filter((customer) =>
+        selectedIds.includes(String(customer.id)),
+    );
+    const filteredCustomers = customers.filter((customer) => {
+        if (query === '') {
+            return true;
+        }
+
+        return [
+            customer.name,
+            customer.company_name ?? '',
+            customer.email ?? '',
+        ].some((value) => value.toLowerCase().includes(query));
+    });
+
+    return (
+        <div className="rounded-md border border-slate-200 p-2">
+            <input
+                type="search"
+                value={search}
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder="Search customer, company, or email"
+                className={`${inputClass} w-full`}
+            />
+            {selectedCustomers.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedCustomers.map((customer) => (
+                        <button
+                            key={customer.id}
+                            type="button"
+                            onClick={() => onToggle(customer)}
+                            className="rounded-full border border-primary/20 bg-pastel-blue px-2.5 py-1 text-xs font-medium text-primary"
+                        >
+                            {customer.name} x
+                        </button>
+                    ))}
+                </div>
+            )}
+            <div className="mt-2 max-h-48 overflow-y-auto">
+                {filteredCustomers.map((customer) => (
+                    <label
+                        key={customer.id}
+                        className="flex items-start gap-2 rounded px-2 py-2 text-sm hover:bg-slate-50"
+                    >
+                        <input
+                            type="checkbox"
+                            checked={selectedIds.includes(String(customer.id))}
+                            onChange={() => onToggle(customer)}
+                            className="mt-1"
+                        />
+                        <span>
+                            <span className="block font-medium text-slate-800">
+                                {customer.name}
+                            </span>
+                            <span className="block text-xs text-slate-500">
+                                {[customer.company_name, customer.email]
+                                    .filter(Boolean)
+                                    .join(' - ') || 'No company detail'}
+                            </span>
+                        </span>
+                    </label>
+                ))}
+                {filteredCustomers.length === 0 && (
+                    <p className="px-2 py-4 text-sm text-slate-500">
+                        No customers found.
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function Field({
     label,
     error,
     children,
+    required = false,
 }: {
     label: string;
     error?: string;
     children: ReactNode;
+    required?: boolean;
 }) {
     return (
         <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700">{label}</span>
+            <span className="font-medium text-slate-700">
+                {label}
+                {required && <span className="text-red-600"> *</span>}
+            </span>
             {children}
             {error && <span className="text-xs text-red-600">{error}</span>}
         </label>

@@ -33,6 +33,7 @@ class PermissionSeeder extends Seeder
             'master_data' => [
                 'manage_departments',
                 'manage_customers',
+                'manage_working_calendar',
             ],
             'administration' => [
                 'manage_users',

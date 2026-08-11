@@ -2,6 +2,7 @@ export type MasterDataFilters = {
     search?: string;
     status?: string;
     department_id?: string;
+    type?: string;
 };
 
 export type CustomerSummary = {
@@ -64,4 +65,27 @@ export type RoleSummary = {
     guard_name: string;
     permissions: string[];
     users_count: number;
+};
+
+export type WorkingDayRuleSummary = {
+    id: number;
+    day_of_week: number;
+    day_name: string;
+    is_working: boolean;
+    description: string | null;
+};
+
+export type HolidaySummary = {
+    id: number;
+    date: string;
+    name: string;
+    type: 'national' | 'company';
+    is_working: boolean;
+    description: string | null;
+    is_active: boolean;
+};
+
+export type SelectOption<T = string> = {
+    value: T;
+    label: string;
 };

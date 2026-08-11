@@ -4,12 +4,16 @@ namespace Tests\Feature;
 
 use App\Models\Customer;
 use App\Models\Department;
+use App\Models\Holiday;
 use App\Models\User;
+use App\Models\WorkingDayRule;
 use Database\Seeders\CustomerSeeder;
 use Database\Seeders\DepartmentSeeder;
+use Database\Seeders\HolidaySeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\UserSeeder;
+use Database\Seeders\WorkingDayRuleSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Permission;
@@ -28,6 +32,8 @@ class MasterSeederTest extends TestCase
             RoleSeeder::class,
             UserSeeder::class,
             CustomerSeeder::class,
+            WorkingDayRuleSeeder::class,
+            HolidaySeeder::class,
         ]);
 
         $user = User::query()
@@ -45,6 +51,7 @@ class MasterSeederTest extends TestCase
         $this->assertTrue($user->can('calculate_project_incentives'));
         $this->assertTrue($user->can('manage_users'));
         $this->assertTrue($user->can('manage_roles'));
+        $this->assertTrue($user->can('manage_working_calendar'));
         $this->assertSame('incentive', $calculatePermission->getAttribute('category'));
         $this->assertNotNull($user->department_id);
         $this->assertGreaterThanOrEqual(5, Department::count());
@@ -52,13 +59,18 @@ class MasterSeederTest extends TestCase
         $this->assertTrue(Role::query()->where('name', 'admin')->exists());
         $this->assertTrue(Role::query()->where('name', 'support')->exists());
         $this->assertTrue(Role::findByName('admin')->hasPermissionTo('approve_projects'));
+        $this->assertTrue(Role::findByName('admin')->hasPermissionTo('manage_working_calendar'));
         $this->assertFalse(Role::findByName('admin')->hasPermissionTo('manage_users'));
         $this->assertTrue(Role::findByName('support')->hasPermissionTo('view_projects'));
         $this->assertTrue(Role::findByName('support')->hasPermissionTo('manage_projects'));
         $this->assertTrue(Role::findByName('support')->hasPermissionTo('view_tasks'));
         $this->assertTrue(Role::findByName('support')->hasPermissionTo('manage_tasks'));
         $this->assertTrue(Role::findByName('support')->hasPermissionTo('manage_customers'));
+        $this->assertFalse(Role::findByName('support')->hasPermissionTo('manage_working_calendar'));
         $this->assertFalse(Role::findByName('support')->hasPermissionTo('manage_users'));
         $this->assertGreaterThanOrEqual(3, Customer::count());
+        $this->assertSame(7, WorkingDayRule::count());
+        $this->assertFalse(WorkingDayRule::query()->where('day_of_week', 7)->firstOrFail()->is_working);
+        $this->assertGreaterThanOrEqual(1, Holiday::count());
     }
 }

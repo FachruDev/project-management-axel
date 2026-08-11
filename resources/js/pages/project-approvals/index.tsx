@@ -159,7 +159,9 @@ export default function ProjectApprovalIndex({ projects }: ProjectApprovalsProps
                         for correction and resubmission.
                     </p>
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium text-slate-700">Reject Notes</span>
+                        <span className="font-medium text-slate-700">
+                            Reject Notes <span className="text-red-600">*</span>
+                        </span>
                         <textarea
                             value={form.data.rejection_notes}
                             onChange={(event) =>

@@ -414,7 +414,7 @@ class IncentiveProfileCrudTest extends TestCase
             'version' => 1,
             'effective_from' => now()->toDateString(),
             'effective_to' => null,
-            'support_percent' => 0.1,
+            'support_percent' => 10,
             'manday_rules' => [
                 ['min_mandays' => 1, 'max_mandays' => 3, 'base_score' => 10],
                 ['min_mandays' => 4, 'max_mandays' => null, 'base_score' => 20],

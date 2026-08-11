@@ -30,7 +30,7 @@ class IncentiveCalculationTest extends TestCase
         $profile = $this->profileWithRules();
         $project = $this->closedProject($profile, [
             'mandays' => 6,
-            'plan_end_date' => '2026-01-10',
+            'plan_end_date' => '2026-01-12',
             'actual_end_date' => '2026-01-08',
         ]);
 
@@ -72,8 +72,8 @@ class IncentiveCalculationTest extends TestCase
         $this->addTechnicalMember($onTimeProject, $profile, 'On Time User', 'manager', 'pm');
 
         $lateProject = $this->closedProject($profile, [
-            'plan_end_date' => '2026-01-10',
-            'actual_end_date' => '2026-01-13',
+            'plan_end_date' => '2026-01-12',
+            'actual_end_date' => '2026-01-14',
         ]);
         $this->addTechnicalMember($lateProject, $profile, 'Late User', 'manager', 'pm');
 
@@ -83,8 +83,25 @@ class IncentiveCalculationTest extends TestCase
         $this->assertSame(DeliveryStatus::OnTime, $onTimeCalculation->delivery_status);
         $this->assertSame('1.0000', $onTimeCalculation->delivery_multiplier);
         $this->assertSame(DeliveryStatus::Late, $lateCalculation->delivery_status);
-        $this->assertSame(3, $lateCalculation->difference_days);
+        $this->assertSame(2, $lateCalculation->difference_days);
         $this->assertSame('0.8000', $lateCalculation->delivery_multiplier);
+    }
+
+    public function test_support_role_rule_marks_member_as_support_even_without_checkbox(): void
+    {
+        $profile = $this->profileWithRules();
+        $project = $this->closedProject($profile);
+        $this->addTechnicalMember($project, $profile, 'Technical User', 'manager', 'pm');
+
+        $supportMember = $this->addSupportMember($project, $profile, 'Role Support');
+        $supportMember->forceFill(['is_support' => false])->save();
+
+        $calculation = app(ProjectIncentiveCalculator::class)->calculate($project);
+        $supportItem = $calculation->items->firstWhere('employee_name', 'Role Support');
+
+        $this->assertNotNull($supportItem);
+        $this->assertTrue($supportItem->is_support);
+        $this->assertSame('2.0000', $supportItem->base_incentive);
     }
 
     public function test_calculator_rejects_inactive_profile(): void

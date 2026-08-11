@@ -240,7 +240,7 @@ export default function RoleIndex({ roles, filters, permission_groups }: Props) 
                 onClose={closePanel}
             >
                 <form onSubmit={submitForm} className="flex flex-col gap-4">
-                    <Field label="Name" error={form.errors.name}>
+                    <Field label="Name" error={form.errors.name} required>
                         <input
                             value={form.data.name}
                             onChange={(event) => form.setData('name', event.target.value)}
@@ -250,7 +250,7 @@ export default function RoleIndex({ roles, filters, permission_groups }: Props) 
                     <div className="flex flex-col gap-4 rounded-lg border border-slate-200 p-4">
                         <div>
                             <div className="text-sm font-medium text-slate-700">
-                                Permissions
+                                Permissions <span className="text-red-600">*</span>
                             </div>
                             {form.errors.permissions && (
                                 <div className="mt-1 text-xs text-red-600">
@@ -308,14 +308,19 @@ function Field({
     label,
     error,
     children,
+    required = false,
 }: {
     label: string;
     error?: string;
     children: ReactNode;
+    required?: boolean;
 }) {
     return (
         <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700">{label}</span>
+            <span className="font-medium text-slate-700">
+                {label}
+                {required && <span className="text-red-600"> *</span>}
+            </span>
             {children}
             {error && <span className="text-xs text-red-600">{error}</span>}
         </label>

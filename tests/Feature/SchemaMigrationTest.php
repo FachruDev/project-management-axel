@@ -53,6 +53,8 @@ class SchemaMigrationTest extends TestCase
         $this->assertTrue(Schema::hasColumns('incentive_delivery_rules', ['incentive_profile_id', 'name', 'min_difference_days', 'max_difference_days', 'multiplier']));
         $this->assertTrue(Schema::hasColumns('project_incentive_calculations', ['project_id', 'incentive_profile_id', 'mandays', 'delivery_status', 'total_incentive']));
         $this->assertTrue(Schema::hasColumns('project_incentive_items', ['calculation_id', 'employee_id', 'employee_name', 'project_role', 'final_incentive']));
+        $this->assertTrue(Schema::hasColumns('working_day_rules', ['day_of_week', 'is_working', 'description']));
+        $this->assertTrue(Schema::hasColumns('holidays', ['date', 'name', 'type', 'is_working', 'description', 'is_active']));
     }
 
     public function test_basic_unique_constraints_are_enforced(): void

@@ -13,6 +13,7 @@ use App\Models\IncentiveProjectRoleRule;
 use App\Models\Project;
 use App\Models\ProjectIncentiveCalculation;
 use App\Models\ProjectMember;
+use App\Services\Calendar\BusinessDayCalculator;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +35,10 @@ use Illuminate\Validation\ValidationException;
  */
 class ProjectIncentiveCalculator
 {
+    public function __construct(
+        private readonly BusinessDayCalculator $businessDayCalculator,
+    ) {}
+
     /**
      * @throws ValidationException
      */
@@ -71,7 +76,7 @@ class ProjectIncentiveCalculator
 
             $targetEndDate = CarbonImmutable::parse((string) $project->plan_end_date)->startOfDay();
             $actualEndDate = CarbonImmutable::parse((string) $project->actual_end_date)->startOfDay();
-            $differenceDays = (int) $targetEndDate->diffInDays($actualEndDate, false);
+            $differenceDays = $this->businessDayCalculator->signedDifference($targetEndDate, $actualEndDate);
             $deliveryRule = $this->matchingDeliveryRule($profile, $differenceDays);
             $deliveryMultiplier = (float) $deliveryRule->multiplier;
             $deliveryStatus = $this->deliveryStatus($differenceDays);

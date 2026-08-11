@@ -1,9 +1,11 @@
 import { index as customersIndex } from '@/actions/App/Http/Controllers/CustomerController';
 import { index as departmentsIndex } from '@/actions/App/Http/Controllers/DepartmentController';
+import { index as holidaysIndex } from '@/actions/App/Http/Controllers/HolidayController';
 import { index as incentiveProfilesIndex } from '@/actions/App/Http/Controllers/IncentiveProfileController';
 import { index as projectApprovalsIndex } from '@/actions/App/Http/Controllers/ProjectApprovalController';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/ProjectController';
 import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
+import { index as workingDayRulesIndex } from '@/actions/App/Http/Controllers/WorkingDayRuleController';
 import projectPreparationsIndex from '@/actions/App/Http/Controllers/ProjectPreparationIndexController';
 import tasksIndex from '@/actions/App/Http/Controllers/TaskBoardController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
@@ -71,6 +73,20 @@ export const sidebarItems: SidebarItem[] = [
         section: 'Master Data',
         href: departmentsIndex.url(),
         permission: 'manage_departments',
+        status: 'ready',
+    },
+    {
+        label: 'Work Days',
+        section: 'Master Data',
+        href: workingDayRulesIndex.url(),
+        permission: 'manage_working_calendar',
+        status: 'ready',
+    },
+    {
+        label: 'Holidays',
+        section: 'Master Data',
+        href: holidaysIndex.url(),
+        permission: 'manage_working_calendar',
         status: 'ready',
     },
     {

@@ -3,6 +3,7 @@
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\IncentiveProfileController;
 use App\Http\Controllers\ProjectApprovalController;
 use App\Http\Controllers\ProjectController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\ProjectTaskStatusController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\TaskBoardController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WorkingDayRuleController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('portal.auth')->group(function (): void {
@@ -82,6 +84,14 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::resource('departments', DepartmentController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->middleware('can:manage_departments');
+
+    Route::resource('working-day-rules', WorkingDayRuleController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('can:manage_working_calendar');
+
+    Route::resource('holidays', HolidayController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middleware('can:manage_working_calendar');
 
     Route::resource('users', UserController::class)
         ->only(['index', 'store', 'update', 'destroy'])

@@ -188,7 +188,7 @@ export default function ProjectPreparation({
             <form onSubmit={submit} className="space-y-5">
                 <Panel title="Preparation Data">
                     <div className="grid gap-4 md:grid-cols-2">
-                        <Field label="PIC PM" error={form.errors.pm_user_id}>
+                        <Field label="PIC PM" error={form.errors.pm_user_id} required>
                             <select
                                 value={form.data.pm_user_id}
                                 onChange={(event) =>
@@ -220,7 +220,7 @@ export default function ProjectPreparation({
                                 ))}
                             </select>
                         </Field>
-                        <Field label="Location" error={form.errors.location}>
+                        <Field label="Location" error={form.errors.location} required>
                             <input
                                 value={form.data.location}
                                 onChange={(event) =>
@@ -229,7 +229,7 @@ export default function ProjectPreparation({
                                 className={inputClass}
                             />
                         </Field>
-                        <Field label="URS Number" error={form.errors.urs_number}>
+                        <Field label="URS Number" error={form.errors.urs_number} required>
                             <input
                                 value={form.data.urs_number}
                                 onChange={(event) =>
@@ -238,7 +238,7 @@ export default function ProjectPreparation({
                                 className={inputClass}
                             />
                         </Field>
-                        <Field label="URS Date" error={form.errors.urs_date}>
+                        <Field label="URS Date" error={form.errors.urs_date} required>
                             <input
                                 type="date"
                                 value={form.data.urs_date}
@@ -248,7 +248,7 @@ export default function ProjectPreparation({
                                 className={inputClass}
                             />
                         </Field>
-                        <Field label="URS File" error={form.errors.urs_file}>
+                        <Field label="URS File" error={form.errors.urs_file} required>
                             <input
                                 type="file"
                                 onChange={(event) =>
@@ -260,7 +260,7 @@ export default function ProjectPreparation({
                                 className={inputClass}
                             />
                         </Field>
-                        <Field label="Plan Start" error={form.errors.plan_start_date}>
+                        <Field label="Plan Start" error={form.errors.plan_start_date} required>
                             <input
                                 type="date"
                                 value={form.data.plan_start_date}
@@ -270,7 +270,7 @@ export default function ProjectPreparation({
                                 className={inputClass}
                             />
                         </Field>
-                        <Field label="Plan End" error={form.errors.plan_end_date}>
+                        <Field label="Plan End" error={form.errors.plan_end_date} required>
                             <input
                                 type="date"
                                 value={form.data.plan_end_date}
@@ -306,7 +306,7 @@ export default function ProjectPreparation({
                         <div className="grid gap-4 md:grid-cols-2">
                             {showUat && (
                                 <>
-                                    <Field label="UAT Date" error={form.errors.uat_date}>
+                                    <Field label="UAT Date" error={form.errors.uat_date} required>
                                         <input
                                             type="date"
                                             value={form.data.uat_date}
@@ -316,7 +316,7 @@ export default function ProjectPreparation({
                                             className={inputClass}
                                         />
                                     </Field>
-                                    <Field label="UAT File" error={form.errors.uat_file}>
+                                    <Field label="UAT File" error={form.errors.uat_file} required>
                                         <input
                                             type="file"
                                             onChange={(event) =>
@@ -332,7 +332,7 @@ export default function ProjectPreparation({
                             )}
                             {showBast && (
                                 <>
-                                    <Field label="BAST Date" error={form.errors.bast_date}>
+                                    <Field label="BAST Date" error={form.errors.bast_date} required>
                                         <input
                                             type="date"
                                             value={form.data.bast_date}
@@ -342,7 +342,7 @@ export default function ProjectPreparation({
                                             className={inputClass}
                                         />
                                     </Field>
-                                    <Field label="BAST File" error={form.errors.bast_file}>
+                                    <Field label="BAST File" error={form.errors.bast_file} required>
                                         <input
                                             type="file"
                                             onChange={(event) =>
@@ -390,7 +390,7 @@ export default function ProjectPreparation({
                                     }
                                     className={inputClass}
                                 >
-                                    <option value="">User</option>
+                                    <option value="">User *</option>
                                     {options.users.map((user) => (
                                         <option key={user.id} value={user.id}>
                                             {user.name}
@@ -399,19 +399,30 @@ export default function ProjectPreparation({
                                 </select>
                                 <select
                                     value={member.incentive_project_role_rule_id}
-                                    onChange={(event) =>
+                                    onChange={(event) => {
+                                        const selectedRule =
+                                            options.project_role_rules.find(
+                                                (rule) =>
+                                                    String(rule.id) ===
+                                                    event.target.value,
+                                            );
+
                                         setMember(indexKey, {
                                             ...member,
                                             incentive_project_role_rule_id:
                                                 event.target.value,
-                                        })
-                                    }
+                                            is_support: selectedRule?.is_support
+                                                ? true
+                                                : member.is_support,
+                                        });
+                                    }}
                                     className={inputClass}
                                 >
-                                    <option value="">Project role</option>
+                                    <option value="">Project role *</option>
                                     {options.project_role_rules.map((rule) => (
                                         <option key={rule.id} value={rule.id}>
                                             {rule.role_name}
+                                            {rule.is_support ? ' (Support)' : ''}
                                         </option>
                                     ))}
                                 </select>
@@ -444,7 +455,7 @@ export default function ProjectPreparation({
                                             })
                                         }
                                     />
-                                    Support
+                                    Support *
                                 </label>
                                 <button
                                     type="button"
@@ -499,7 +510,7 @@ export default function ProjectPreparation({
                                     }
                                     className={inputClass}
                                 >
-                                    <option value="">User</option>
+                                    <option value="">User *</option>
                                     {options.users.map((user) => (
                                         <option key={user.id} value={user.id}>
                                             {user.name}
@@ -585,7 +596,7 @@ export default function ProjectPreparation({
                                                             name: event.target.value,
                                                         })
                                                     }
-                                                    placeholder="Task name"
+                                                    placeholder="Task name *"
                                                     className={inputClass}
                                                 />
                                                 <div className="grid gap-2">
@@ -639,30 +650,42 @@ export default function ProjectPreparation({
                                                     </select>
                                                 </div>
                                                 <div className="grid gap-2">
-                                                    <input
-                                                        type="date"
-                                                        value={task.plan_start_date}
-                                                        onChange={(event) =>
-                                                            setTask(indexKey, {
-                                                                ...task,
-                                                                plan_start_date:
-                                                                    event.target.value,
-                                                            })
-                                                        }
-                                                        className={inputClass}
-                                                    />
-                                                    <input
-                                                        type="date"
-                                                        value={task.plan_end_date}
-                                                        onChange={(event) =>
-                                                            setTask(indexKey, {
-                                                                ...task,
-                                                                plan_end_date:
-                                                                    event.target.value,
-                                                            })
-                                                        }
-                                                        className={inputClass}
-                                                    />
+                                                    <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                                                        <span>
+                                                            Plan Start{' '}
+                                                            <span className="text-red-600">*</span>
+                                                        </span>
+                                                        <input
+                                                            type="date"
+                                                            value={task.plan_start_date}
+                                                            onChange={(event) =>
+                                                                setTask(indexKey, {
+                                                                    ...task,
+                                                                    plan_start_date:
+                                                                        event.target.value,
+                                                                })
+                                                            }
+                                                            className={inputClass}
+                                                        />
+                                                    </label>
+                                                    <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+                                                        <span>
+                                                            Plan End{' '}
+                                                            <span className="text-red-600">*</span>
+                                                        </span>
+                                                        <input
+                                                            type="date"
+                                                            value={task.plan_end_date}
+                                                            onChange={(event) =>
+                                                                setTask(indexKey, {
+                                                                    ...task,
+                                                                    plan_end_date:
+                                                                        event.target.value,
+                                                                })
+                                                            }
+                                                            className={inputClass}
+                                                        />
+                                                    </label>
                                                 </div>
                                                 <textarea
                                                     value={task.description ?? ''}
@@ -799,14 +822,19 @@ function Field({
     label,
     error,
     children,
+    required = false,
 }: {
     label: string;
     error?: string;
     children: ReactNode;
+    required?: boolean;
 }) {
     return (
         <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700">{label}</span>
+            <span className="font-medium text-slate-700">
+                {label}
+                {required && <span className="text-red-600"> *</span>}
+            </span>
             {children}
             {error && <span className="text-xs text-red-600">{error}</span>}
         </label>

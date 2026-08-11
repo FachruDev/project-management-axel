@@ -45,7 +45,7 @@ export default function IncentiveProfileForm({ mode, profile }: Props) {
         version: profile.version,
         effective_from: profile.effective_from,
         effective_to: profile.effective_to,
-        support_percent: profile.support_percent,
+        support_percent: percentValue(profile.support_percent),
         manday_rules: profile.manday_rules,
         pic_level_rules: profile.pic_level_rules,
         project_role_rules: profile.project_role_rules,
@@ -110,6 +110,7 @@ export default function IncentiveProfileForm({ mode, profile }: Props) {
                                 <Field
                                     label="Code"
                                     error={errorFor(form.errors, 'code')}
+                                    required
                                 >
                                     <input
                                         disabled={isLocked}
@@ -126,6 +127,7 @@ export default function IncentiveProfileForm({ mode, profile }: Props) {
                                 <Field
                                     label="Name"
                                     error={errorFor(form.errors, 'name')}
+                                    required
                                 >
                                     <input
                                         disabled={isLocked}
@@ -142,6 +144,7 @@ export default function IncentiveProfileForm({ mode, profile }: Props) {
                                 <Field
                                     label="Version"
                                     error={errorFor(form.errors, 'version')}
+                                    required
                                 >
                                     <input
                                         disabled={isLocked}
@@ -163,13 +166,14 @@ export default function IncentiveProfileForm({ mode, profile }: Props) {
                                         form.errors,
                                         'support_percent',
                                     )}
+                                    required
                                 >
                                     <input
                                         disabled={isLocked}
-                                        type="number"
+                                        type="text"
+                                        inputMode="decimal"
                                         min={0}
-                                        max={1}
-                                        step="0.0001"
+                                        max={100}
                                         value={form.data.support_percent}
                                         onChange={(event) =>
                                             form.setData(
@@ -180,12 +184,17 @@ export default function IncentiveProfileForm({ mode, profile }: Props) {
                                         className={inputClass}
                                     />
                                 </Field>
+                                <p className="-mt-2 text-xs text-zinc-500 md:col-span-2 lg:col-span-4">
+                                    Isi dalam persen 0 sampai 100. Sistem akan
+                                    menyimpan sebagai rasio untuk kalkulasi.
+                                </p>
                                 <Field
                                     label="Effective From"
                                     error={errorFor(
                                         form.errors,
                                         'effective_from',
                                     )}
+                                    required
                                 >
                                     <input
                                         disabled={isLocked}
@@ -337,6 +346,7 @@ function MandayRules({
                         disabled={disabled}
                         label="Min"
                         value={rule.min_mandays}
+                        required
                         onChange={(value) =>
                             onChange(
                                 updateRow(
@@ -353,6 +363,7 @@ function MandayRules({
                         label="Max"
                         value={rule.max_mandays}
                         nullable
+                        openEndedHint
                         onChange={(value) =>
                             onChange(
                                 updateRow(
@@ -369,6 +380,8 @@ function MandayRules({
                         label="Base Score"
                         value={rule.base_score}
                         step="0.0001"
+                        decimal
+                        required
                         onChange={(value) =>
                             onChange(
                                 updateRow(
@@ -423,6 +436,7 @@ function PicLevelRules({
                         disabled={disabled}
                         label="Code"
                         value={rule.level_code}
+                        required
                         onChange={(value) =>
                             onChange(
                                 updateRow(rules, indexKey, 'level_code', value),
@@ -433,6 +447,7 @@ function PicLevelRules({
                         disabled={disabled}
                         label="Name"
                         value={rule.level_name}
+                        required
                         onChange={(value) =>
                             onChange(
                                 updateRow(rules, indexKey, 'level_name', value),
@@ -444,6 +459,8 @@ function PicLevelRules({
                         label="Points"
                         value={rule.points}
                         step="0.0001"
+                        decimal
+                        required
                         onChange={(value) =>
                             onChange(
                                 updateRow(
@@ -499,6 +516,7 @@ function ProjectRoleRules({
                         disabled={disabled}
                         label="Code"
                         value={rule.role_code}
+                        required
                         onChange={(value) =>
                             onChange(
                                 updateRow(rules, indexKey, 'role_code', value),
@@ -509,6 +527,7 @@ function ProjectRoleRules({
                         disabled={disabled}
                         label="Name"
                         value={rule.role_name}
+                        required
                         onChange={(value) =>
                             onChange(
                                 updateRow(rules, indexKey, 'role_name', value),
@@ -520,6 +539,8 @@ function ProjectRoleRules({
                         label="Points"
                         value={rule.points}
                         step="0.0001"
+                        decimal
+                        required
                         onChange={(value) =>
                             onChange(
                                 updateRow(
@@ -548,7 +569,9 @@ function ProjectRoleRules({
                             }
                             className="mb-2 h-4 w-4 rounded border-zinc-300"
                         />
-                        <span className="pb-1.5">Support</span>
+                        <span className="pb-1.5">
+                            Support <span className="text-red-600">*</span>
+                        </span>
                     </label>
                     <RemoveButton
                         disabled={disabled || rules.length === 1}
@@ -585,6 +608,11 @@ function DeliveryRules({
             }
             disabled={disabled}
         >
+            <p className="rounded-lg border border-blue-100 bg-pastel-blue px-3 py-2 text-xs text-primary">
+                Contoh aman: early min kosong max -1, on-time 0 sampai 0,
+                late 1 sampai 30, very late 31 sampai kosong dengan multiplier
+                0. Range tidak boleh saling menabrak.
+            </p>
             {rules.map((rule, indexKey) => (
                 <div
                     key={indexKey}
@@ -594,6 +622,7 @@ function DeliveryRules({
                         disabled={disabled}
                         label="Name"
                         value={rule.name}
+                        required
                         onChange={(value) =>
                             onChange(updateRow(rules, indexKey, 'name', value))
                         }
@@ -603,6 +632,7 @@ function DeliveryRules({
                         label="Min Days"
                         value={rule.min_difference_days}
                         nullable
+                        openEndedHint
                         onChange={(value) =>
                             onChange(
                                 updateRow(
@@ -619,6 +649,7 @@ function DeliveryRules({
                         label="Max Days"
                         value={rule.max_difference_days}
                         nullable
+                        openEndedHint
                         onChange={(value) =>
                             onChange(
                                 updateRow(
@@ -635,6 +666,8 @@ function DeliveryRules({
                         label="Multiplier"
                         value={rule.multiplier}
                         step="0.0001"
+                        decimal
+                        required
                         onChange={(value) =>
                             onChange(
                                 updateRow(
@@ -690,15 +723,20 @@ function Field({
     error,
     children,
     className = '',
+    required = false,
 }: {
     label: string;
     error: string | null;
     children: ReactNode;
     className?: string;
+    required?: boolean;
 }) {
     return (
         <label className={`flex flex-col gap-1 text-sm ${className}`}>
-            <span className="font-medium text-zinc-700">{label}</span>
+            <span className="font-medium text-zinc-700">
+                {label}
+                {required && <span className="text-red-600"> *</span>}
+            </span>
             {children}
             {error && <span className="text-xs text-red-600">{error}</span>}
         </label>
@@ -710,15 +748,20 @@ function TextInput({
     value,
     onChange,
     disabled,
+    required = false,
 }: {
     label: string;
     value: string;
     onChange: (value: string) => void;
     disabled: boolean;
+    required?: boolean;
 }) {
     return (
         <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600">
-            {label}
+            <span>
+                {label}
+                {required && <span className="text-red-600"> *</span>}
+            </span>
             <input
                 disabled={disabled}
                 value={value}
@@ -736,6 +779,9 @@ function NumberInput({
     disabled,
     nullable = false,
     step = '1',
+    decimal = false,
+    openEndedHint = false,
+    required = false,
 }: {
     label: string;
     value: number | string | null;
@@ -743,13 +789,20 @@ function NumberInput({
     disabled: boolean;
     nullable?: boolean;
     step?: string;
+    decimal?: boolean;
+    openEndedHint?: boolean;
+    required?: boolean;
 }) {
     return (
         <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600">
-            {label}
+            <span>
+                {label}
+                {required && <span className="text-red-600"> *</span>}
+            </span>
             <input
                 disabled={disabled}
-                type="number"
+                type="text"
+                inputMode={decimal ? 'decimal' : 'numeric'}
                 step={step}
                 value={value ?? ''}
                 onChange={(event) =>
@@ -761,6 +814,11 @@ function NumberInput({
                 }
                 className={inputClass}
             />
+            {openEndedHint && (
+                <span className="text-[11px] font-normal text-zinc-400">
+                    Kosong atau - berarti open-ended.
+                </span>
+            )}
         </label>
     );
 }
@@ -802,6 +860,16 @@ function nullableValue(value: string) {
 
 function requiredNumberValue(value: number | string | null) {
     return value ?? '';
+}
+
+function percentValue(value: number | string) {
+    const normalized = Number(String(value).replace(',', '.'));
+
+    if (Number.isNaN(normalized)) {
+        return value;
+    }
+
+    return Number((normalized * 100).toFixed(4)).toString();
 }
 
 function updateRow<T, K extends keyof T>(

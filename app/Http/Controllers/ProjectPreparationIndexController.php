@@ -45,6 +45,7 @@ class ProjectPreparationIndexController extends Controller
                 'customers' => $project->customers->map(fn (Customer $customer): array => [
                     'id' => $customer->id,
                     'name' => $customer->name,
+                    'email' => $customer->email,
                     'company_name' => $customer->company_name,
                 ])->values()->all(),
                 'pm' => $project->pm ? $this->userOption($project->pm) : null,
@@ -90,7 +91,7 @@ class ProjectPreparationIndexController extends Controller
                 'customers' => Customer::query()
                     ->where('is_active', true)
                     ->orderBy('name')
-                    ->get(['id', 'name', 'company_name']),
+                    ->get(['id', 'name', 'email', 'company_name']),
                 'incentive_profiles' => IncentiveProfile::query()
                     ->where('status', IncentiveProfileStatus::Active->value)
                     ->orderBy('code')

@@ -33,6 +33,7 @@ export type UserOption = {
 export type CustomerProjectOption = {
     id: number;
     name: string;
+    email?: string | null;
     company_name: string | null;
     is_primary?: boolean;
 };

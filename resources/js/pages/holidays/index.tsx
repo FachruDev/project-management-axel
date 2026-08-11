@@ -6,57 +6,59 @@ import {
     index,
     store,
     update,
-} from '@/actions/App/Http/Controllers/CustomerController';
+} from '@/actions/App/Http/Controllers/HolidayController';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { AppLayout } from '@/layouts/app-layout';
-import type { CustomerSummary, MasterDataFilters, Paginated } from '@/types';
+import type {
+    HolidaySummary,
+    MasterDataFilters,
+    Paginated,
+    SelectOption,
+} from '@/types';
 
 type Props = {
-    customers: Paginated<CustomerSummary>;
+    holidays: Paginated<HolidaySummary>;
     filters: MasterDataFilters;
+    types: SelectOption[];
 };
 
-type CustomerPayload = {
+type HolidayPayload = {
+    date: string;
     name: string;
-    email: string;
-    company_name: string;
-    company_address: string;
+    type: string;
+    is_working: boolean;
+    description: string;
     is_active: boolean;
 };
 
-const blankCustomer: CustomerPayload = {
+const blankHoliday: HolidayPayload = {
+    date: '',
     name: '',
-    email: '',
-    company_name: '',
-    company_address: '',
+    type: 'national',
+    is_working: false,
+    description: '',
     is_active: true,
 };
 
 const inputClass =
-    'rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-700';
+    'rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary';
 
-export default function CustomerIndex({ customers, filters }: Props) {
+export default function HolidaysIndex({ holidays, filters, types }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
-    const [editing, setEditing] = useState<CustomerSummary | null>(null);
+    const [type, setType] = useState(filters.type ?? '');
+    const [editing, setEditing] = useState<HolidaySummary | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     const flash = usePage().props.flash as { success?: string | null } | undefined;
-    const errors = usePage().props.errors as Record<string, string> | undefined;
-
-    const form = useForm<CustomerPayload>(blankCustomer);
+    const form = useForm<HolidayPayload>(blankHoliday);
 
     function submitFilters(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
 
         router.get(
-            index.url({
-                query: {
-                    search,
-                    status,
-                },
-            }),
+            index.url({ query: { search, status, type } }),
             {},
             {
                 preserveScroll: true,
@@ -68,19 +70,20 @@ export default function CustomerIndex({ customers, filters }: Props) {
     function openCreate() {
         setEditing(null);
         form.clearErrors();
-        form.setData(blankCustomer);
+        form.setData(blankHoliday);
         setModalOpen(true);
     }
 
-    function openEdit(customer: CustomerSummary) {
-        setEditing(customer);
+    function openEdit(holiday: HolidaySummary) {
+        setEditing(holiday);
         form.clearErrors();
         form.setData({
-            name: customer.name,
-            email: customer.email ?? '',
-            company_name: customer.company_name ?? '',
-            company_address: customer.company_address ?? '',
-            is_active: customer.is_active,
+            date: holiday.date,
+            name: holiday.name,
+            type: holiday.type,
+            is_working: holiday.is_working,
+            description: holiday.description ?? '',
+            is_active: holiday.is_active,
         });
         setModalOpen(true);
     }
@@ -107,53 +110,61 @@ export default function CustomerIndex({ customers, filters }: Props) {
         form.post(store.url(), options);
     }
 
-    function deleteCustomer(customer: CustomerSummary) {
-        if (!window.confirm('Delete this customer?')) {
+    function deleteHoliday(holiday: HolidaySummary) {
+        if (!window.confirm('Delete this holiday?')) {
             return;
         }
 
-        router.delete(destroy.url(customer.id), {
+        router.delete(destroy.url(holiday.id), {
             preserveScroll: true,
         });
     }
 
     return (
-        <AppLayout title="Customers">
+        <AppLayout title="Holidays">
             <PageHeader
                 eyebrow="Master Data"
-                title="Customers"
+                title="Holidays"
+                description="Kelola hari libur nasional/perusahaan dan override hari masuk kerja untuk SLA."
                 actions={
                     <button
                         type="button"
                         onClick={openCreate}
-                        className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
                     >
-                        New Customer
+                        New Holiday
                     </button>
                 }
             />
 
             {flash?.success && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                <div className="rounded-lg border border-emerald-200 bg-pastel-green px-4 py-3 text-sm text-emerald-800">
                     {flash.success}
-                </div>
-            )}
-            {errors?.customer && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {errors.customer}
                 </div>
             )}
 
             <form
                 onSubmit={submitFilters}
-                className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-[1fr_180px_auto]"
+                className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 lg:grid-cols-[1fr_180px_180px_auto]"
             >
                 <input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search customer, email, company"
+                    placeholder="Search holiday or description"
                     className={inputClass}
                 />
+                <select
+                    value={type}
+                    onChange={(event) => setType(event.target.value)}
+                    className={inputClass}
+                >
+                    <option value="">All Types</option>
+                    {types.map((option) => (
+                        <option key={option.value} value={option.value}>
+                            {option.label}
+                        </option>
+                    ))}
+                </select>
                 <select
                     value={status}
                     onChange={(event) => setStatus(event.target.value)}
@@ -165,7 +176,7 @@ export default function CustomerIndex({ customers, filters }: Props) {
                 </select>
                 <button
                     type="submit"
-                    className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
+                    className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-pastel-blue"
                 >
                     Apply
                 </button>
@@ -176,48 +187,50 @@ export default function CustomerIndex({ customers, filters }: Props) {
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                             <tr>
-                                <th className="px-4 py-3">Customer</th>
-                                <th className="px-4 py-3">Company</th>
-                                <th className="px-4 py-3">Projects</th>
+                                <th className="px-4 py-3">Holiday</th>
+                                <th className="px-4 py-3">Type</th>
+                                <th className="px-4 py-3">Work Override</th>
                                 <th className="px-4 py-3">Status</th>
                                 <th className="px-4 py-3 text-right">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {customers.data.map((customer) => (
-                                <tr key={customer.id} className="hover:bg-slate-50">
+                            {holidays.data.map((holiday) => (
+                                <tr key={holiday.id} className="hover:bg-slate-50">
                                     <td className="px-4 py-3">
                                         <div className="font-medium text-slate-950">
-                                            {customer.name}
+                                            {holiday.name}
                                         </div>
                                         <div className="text-xs text-slate-500">
-                                            {customer.email ?? '-'}
+                                            {holiday.date}
                                         </div>
+                                        {holiday.description && (
+                                            <div className="mt-1 max-w-md truncate text-xs text-slate-500">
+                                                {holiday.description}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-4 py-3 text-slate-600">
-                                        <div>{customer.company_name ?? '-'}</div>
-                                        <div className="max-w-md truncate text-xs">
-                                            {customer.company_address ?? '-'}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-slate-600">
-                                        {customer.projects_count}
+                                        {holiday.type.replace('_', ' ')}
                                     </td>
                                     <td className="px-4 py-3">
-                                        <StatusBadge active={customer.is_active} />
+                                        <WorkOverrideBadge active={holiday.is_working} />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <StatusBadge active={holiday.is_active} />
                                     </td>
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex justify-end gap-2">
                                             <button
                                                 type="button"
-                                                onClick={() => openEdit(customer)}
+                                                onClick={() => openEdit(holiday)}
                                                 className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
                                             >
                                                 Edit
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => deleteCustomer(customer)}
+                                                onClick={() => deleteHoliday(holiday)}
                                                 className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
                                             >
                                                 Delete
@@ -226,28 +239,36 @@ export default function CustomerIndex({ customers, filters }: Props) {
                                     </td>
                                 </tr>
                             ))}
-                            {customers.data.length === 0 && (
+                            {holidays.data.length === 0 && (
                                 <tr>
                                     <td
                                         colSpan={5}
                                         className="px-4 py-12 text-center text-sm text-slate-500"
                                     >
-                                        No customers found.
+                                        No holidays found.
                                     </td>
                                 </tr>
                             )}
                         </tbody>
                     </table>
                 </div>
-                <Pagination data={customers} />
+                <Pagination data={holidays} />
             </section>
 
             <Modal
                 open={modalOpen}
-                title={editing ? 'Edit Customer' : 'New Customer'}
+                title={editing ? 'Edit Holiday' : 'New Holiday'}
                 onClose={closeModal}
             >
                 <form onSubmit={submitForm} className="flex flex-col gap-4">
+                    <Field label="Date" error={form.errors.date} required>
+                        <input
+                            type="date"
+                            value={form.data.date}
+                            onChange={(event) => form.setData('date', event.target.value)}
+                            className={inputClass}
+                        />
+                    </Field>
                     <Field label="Name" error={form.errors.name} required>
                         <input
                             value={form.data.name}
@@ -255,33 +276,46 @@ export default function CustomerIndex({ customers, filters }: Props) {
                             className={inputClass}
                         />
                     </Field>
-                    <Field label="Email" error={form.errors.email}>
-                        <input
-                            type="email"
-                            value={form.data.email}
-                            onChange={(event) => form.setData('email', event.target.value)}
+                    <Field label="Type" error={form.errors.type} required>
+                        <select
+                            value={form.data.type}
+                            onChange={(event) => form.setData('type', event.target.value)}
                             className={inputClass}
-                        />
+                        >
+                            {types.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
                     </Field>
-                    <Field label="Company Name" error={form.errors.company_name}>
-                        <input
-                            value={form.data.company_name}
-                            onChange={(event) => form.setData('company_name', event.target.value)}
-                            className={inputClass}
-                        />
-                    </Field>
-                    <Field label="Company Address" error={form.errors.company_address}>
+                    <Field label="Description" error={form.errors.description}>
                         <textarea
-                            value={form.data.company_address}
-                            onChange={(event) => form.setData('company_address', event.target.value)}
+                            value={form.data.description}
+                            onChange={(event) =>
+                                form.setData('description', event.target.value)
+                            }
                             className={`${inputClass} min-h-24`}
                         />
                     </Field>
                     <label className="flex items-center gap-2 text-sm text-slate-700">
                         <input
                             type="checkbox"
+                            checked={form.data.is_working}
+                            onChange={(event) =>
+                                form.setData('is_working', event.target.checked)
+                            }
+                            className="h-4 w-4 rounded border-slate-300"
+                        />
+                        Mark as working day *
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                            type="checkbox"
                             checked={form.data.is_active}
-                            onChange={(event) => form.setData('is_active', event.target.checked)}
+                            onChange={(event) =>
+                                form.setData('is_active', event.target.checked)
+                            }
                             className="h-4 w-4 rounded border-slate-300"
                         />
                         Active *
@@ -297,7 +331,7 @@ export default function CustomerIndex({ customers, filters }: Props) {
                         <button
                             type="submit"
                             disabled={form.processing}
-                            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:bg-slate-400"
+                            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:bg-slate-400"
                         >
                             {form.processing ? 'Saving...' : 'Save'}
                         </button>
@@ -336,11 +370,25 @@ function StatusBadge({ active }: { active: boolean }) {
         <span
             className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${
                 active
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                    : 'border-slate-200 bg-slate-100 text-slate-600'
+                    ? 'border-emerald-200 bg-pastel-green text-emerald-700'
+                    : 'border-slate-200 bg-pastel-slate text-slate-600'
             }`}
         >
             {active ? 'active' : 'inactive'}
+        </span>
+    );
+}
+
+function WorkOverrideBadge({ active }: { active: boolean }) {
+    return (
+        <span
+            className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${
+                active
+                    ? 'border-blue-200 bg-pastel-blue text-primary'
+                    : 'border-red-200 bg-pastel-red text-red-700'
+            }`}
+        >
+            {active ? 'working' : 'holiday'}
         </span>
     );
 }

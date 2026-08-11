@@ -241,14 +241,14 @@ export default function DepartmentIndex({ departments, filters }: Props) {
                 onClose={closeModal}
             >
                 <form onSubmit={submitForm} className="flex flex-col gap-4">
-                    <Field label="Code" error={form.errors.code}>
+                    <Field label="Code" error={form.errors.code} required>
                         <input
                             value={form.data.code}
                             onChange={(event) => form.setData('code', event.target.value)}
                             className={inputClass}
                         />
                     </Field>
-                    <Field label="Name" error={form.errors.name}>
+                    <Field label="Name" error={form.errors.name} required>
                         <input
                             value={form.data.name}
                             onChange={(event) => form.setData('name', event.target.value)}
@@ -269,7 +269,7 @@ export default function DepartmentIndex({ departments, filters }: Props) {
                             onChange={(event) => form.setData('is_active', event.target.checked)}
                             className="h-4 w-4 rounded border-slate-300"
                         />
-                        Active
+                        Active *
                     </label>
                     <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
                         <button
@@ -297,14 +297,19 @@ function Field({
     label,
     error,
     children,
+    required = false,
 }: {
     label: string;
     error?: string;
     children: ReactNode;
+    required?: boolean;
 }) {
     return (
         <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-700">{label}</span>
+            <span className="font-medium text-slate-700">
+                {label}
+                {required && <span className="text-red-600"> *</span>}
+            </span>
             {children}
             {error && <span className="text-xs text-red-600">{error}</span>}
         </label>
