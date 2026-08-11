@@ -24,6 +24,11 @@ class PermissionSeeder extends Seeder
             'project' => [
                 'manage_projects',
                 'view_projects',
+                'approve_projects',
+            ],
+            'task' => [
+                'manage_tasks',
+                'view_tasks',
             ],
             'master_data' => [
                 'manage_departments',

@@ -1,6 +1,8 @@
 import { index as customersIndex } from '@/actions/App/Http/Controllers/CustomerController';
 import { index as departmentsIndex } from '@/actions/App/Http/Controllers/DepartmentController';
 import { index as incentiveProfilesIndex } from '@/actions/App/Http/Controllers/IncentiveProfileController';
+import { index as projectApprovalsIndex } from '@/actions/App/Http/Controllers/ProjectApprovalController';
+import { index as projectsIndex } from '@/actions/App/Http/Controllers/ProjectController';
 import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
 import { home } from '@/routes';
@@ -23,13 +25,22 @@ export const sidebarItems: SidebarItem[] = [
     {
         label: 'Projects',
         section: 'Project',
+        href: projectsIndex.url(),
         permission: 'manage_projects',
-        status: 'planned',
+        status: 'ready',
+    },
+    {
+        label: 'Project Approvals',
+        section: 'Project',
+        href: projectApprovalsIndex.url(),
+        permission: 'approve_projects',
+        status: 'ready',
     },
     {
         label: 'Tasks',
         section: 'Project',
-        permission: 'manage_projects',
+        href: projectsIndex.url(),
+        permission: 'manage_tasks',
         status: 'planned',
     },
     {

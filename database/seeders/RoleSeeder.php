@@ -21,19 +21,25 @@ class RoleSeeder extends Seeder
             ->pluck('name')
             ->all();
 
+        $adminPermissions = Permission::query()
+            ->where('guard_name', 'web')
+            ->whereNotIn('name', ['manage_users'])
+            ->pluck('name')
+            ->all();
+
+        $supportPermissions = [
+            'manage_projects',
+            'view_projects',
+            'approve_projects',
+            'manage_tasks',
+            'view_tasks',
+            'manage_customers',
+        ];
+
         $roles = [
             'super_admin' => $allPermissions,
-            'admin' => $allPermissions,
-            'project_manager' => [
-                'manage_projects',
-                'view_projects',
-                'view_project_incentives',
-                'calculate_project_incentives',
-            ],
-            'member' => [
-                'view_projects',
-                'view_project_incentives',
-            ],
+            'admin' => $adminPermissions,
+            'support' => $supportPermissions,
         ];
 
         foreach ($roles as $roleName => $permissionNames) {

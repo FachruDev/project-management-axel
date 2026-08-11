@@ -141,6 +141,6 @@ class PortalAuthenticationTest extends TestCase
 
     private function getInertia(string $uri): TestResponse
     {
-        return $this->withHeaders(['X-Inertia' => 'true'])->get($uri);
+        return $this->get($uri);
     }
 }

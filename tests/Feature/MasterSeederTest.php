@@ -48,7 +48,17 @@ class MasterSeederTest extends TestCase
         $this->assertSame('incentive', $calculatePermission->getAttribute('category'));
         $this->assertNotNull($user->department_id);
         $this->assertGreaterThanOrEqual(5, Department::count());
-        $this->assertGreaterThanOrEqual(4, Role::count());
+        $this->assertTrue(Role::query()->where('name', 'super_admin')->exists());
+        $this->assertTrue(Role::query()->where('name', 'admin')->exists());
+        $this->assertTrue(Role::query()->where('name', 'support')->exists());
+        $this->assertTrue(Role::findByName('admin')->hasPermissionTo('approve_projects'));
+        $this->assertFalse(Role::findByName('admin')->hasPermissionTo('manage_users'));
+        $this->assertTrue(Role::findByName('support')->hasPermissionTo('view_projects'));
+        $this->assertTrue(Role::findByName('support')->hasPermissionTo('manage_projects'));
+        $this->assertTrue(Role::findByName('support')->hasPermissionTo('view_tasks'));
+        $this->assertTrue(Role::findByName('support')->hasPermissionTo('manage_tasks'));
+        $this->assertTrue(Role::findByName('support')->hasPermissionTo('manage_customers'));
+        $this->assertFalse(Role::findByName('support')->hasPermissionTo('manage_users'));
         $this->assertGreaterThanOrEqual(3, Customer::count());
     }
 }

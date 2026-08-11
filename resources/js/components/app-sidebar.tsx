@@ -27,7 +27,7 @@ export function AppSidebar({ open, onCollapse }: Props) {
             <div className="flex h-screen w-72 flex-col">
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                     <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-semibold text-white">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-white">
                             PM
                         </div>
                         <div className="min-w-0">
@@ -99,7 +99,7 @@ function SidebarLink({
 }) {
     const className = `flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition ${
         active
-            ? 'bg-slate-900 text-white'
+            ? 'bg-primary text-white'
             : item.href && item.allowed
               ? 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'
               : 'cursor-not-allowed text-slate-400'

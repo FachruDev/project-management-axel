@@ -17,7 +17,7 @@ class ExampleTest extends TestCase
             'external_id' => 'test.user',
         ]);
 
-        $response = $this->withHeaders(['X-Inertia' => 'true'])->get(route('home', ['user_id' => 'test.user']));
+        $response = $this->get(route('home', ['user_id' => 'test.user']));
 
         $response->assertOk();
     }

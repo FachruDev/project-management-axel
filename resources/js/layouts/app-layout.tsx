@@ -20,7 +20,7 @@ export function AppLayout({ title, children }: Props) {
                         type="button"
                         aria-label="Expand sidebar"
                         onClick={() => setSidebarOpen(true)}
-                        className="fixed top-4 left-4 z-30 flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
+                        className="fixed top-4 left-4 z-30 flex h-10 w-10 items-center justify-center rounded-md border border-primary/20 bg-white text-primary shadow-sm hover:bg-pastel-blue"
                     >
                         <span aria-hidden="true">☰</span>
                     </button>

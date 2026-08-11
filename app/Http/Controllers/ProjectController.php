@@ -1,0 +1,363 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Enums\AttachmentCollection;
+use App\Enums\IncentiveProfileStatus;
+use App\Enums\ProjectStatus;
+use App\Enums\TaskStatus;
+use App\Exceptions\ProjectLifecycleException;
+use App\Http\Requests\StoreProjectRequest;
+use App\Http\Requests\UpdateProjectRequest;
+use App\Models\Attachment;
+use App\Models\Customer;
+use App\Models\IncentiveProfile;
+use App\Models\Project;
+use App\Models\ProjectTask;
+use App\Models\User;
+use App\Services\Projects\ProjectLifecycleService;
+use App\Services\Projects\ProjectWriteService;
+use DateTimeInterface;
+use Illuminate\Database\Eloquent\Relations\Pivot;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class ProjectController extends Controller
+{
+    public function __construct(
+        private readonly ProjectWriteService $writeService,
+        private readonly ProjectLifecycleService $lifecycleService,
+    ) {}
+
+    public function index(Request $request): Response
+    {
+        $search = $request->string('search')->trim()->toString();
+        $status = $request->string('status')->trim()->toString();
+        $customerId = $request->string('customer_id')->trim()->toString();
+        $pmUserId = $request->string('pm_user_id')->trim()->toString();
+
+        $projects = Project::query()
+            ->with(['customers', 'pm', 'incentiveProfile'])
+            ->withCount(['tasks', 'members'])
+            ->when($search !== '', fn ($query) => $query->where('name', 'like', "%{$search}%"))
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($customerId !== '', fn ($query) => $query->whereHas('customers', fn ($query) => $query->whereKey($customerId)))
+            ->when($pmUserId !== '', fn ($query) => $query->where('pm_user_id', $pmUserId))
+            ->latest()
+            ->paginate(10)
+            ->withQueryString()
+            ->through(fn (Project $project): array => $this->summary($project));
+
+        return Inertia::render('projects/index', [
+            'projects' => $projects,
+            'metrics' => $this->statusMetrics(),
+            'filters' => [
+                'search' => $search,
+                'status' => $status,
+                'customer_id' => $customerId,
+                'pm_user_id' => $pmUserId,
+            ],
+            'options' => $this->options(),
+        ]);
+    }
+
+    public function store(StoreProjectRequest $request): RedirectResponse
+    {
+        $project = $this->writeService->create($request->validated(), $this->actor($request));
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('success', 'Project saved.');
+    }
+
+    public function show(Project $project): Response
+    {
+        return Inertia::render('projects/show', [
+            'project' => $this->detail($this->loadProject($project)),
+        ]);
+    }
+
+    public function update(UpdateProjectRequest $request, Project $project): RedirectResponse
+    {
+        $project = $this->writeService->update($project, $request->validated(), $this->actor($request));
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('success', 'Project updated.');
+    }
+
+    public function submitApproval(Request $request, Project $project): RedirectResponse
+    {
+        try {
+            $project = $this->lifecycleService->submitForApproval($project, $this->actor($request));
+        } catch (ProjectLifecycleException $exception) {
+            return back()->withErrors(['project' => $exception->getMessage()]);
+        }
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('success', 'Project submitted for approval.');
+    }
+
+    public function resubmit(Request $request, Project $project): RedirectResponse
+    {
+        try {
+            $project = $this->lifecycleService->resubmit($project, $this->actor($request));
+        } catch (ProjectLifecycleException $exception) {
+            return back()->withErrors(['project' => $exception->getMessage()]);
+        }
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('success', 'Project resubmitted.');
+    }
+
+    public function start(Request $request, Project $project): RedirectResponse
+    {
+        try {
+            $project = $this->lifecycleService->start($project, $this->actor($request));
+        } catch (ProjectLifecycleException $exception) {
+            return back()->withErrors(['project' => $exception->getMessage()]);
+        }
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('success', 'Project started.');
+    }
+
+    public function refreshStatus(Project $project): RedirectResponse
+    {
+        $project = $this->lifecycleService->refreshAutomaticStatus($project);
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('success', 'Project status refreshed.');
+    }
+
+    public function close(Request $request, Project $project): RedirectResponse
+    {
+        try {
+            $project = $this->lifecycleService->close($project, $this->actor($request));
+        } catch (ProjectLifecycleException $exception) {
+            return back()->withErrors(['project' => $exception->getMessage()]);
+        }
+
+        return redirect()
+            ->route('projects.show', $project)
+            ->with('success', 'Project closed.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function summary(Project $project): array
+    {
+        return [
+            'id' => $project->id,
+            'name' => $project->name,
+            'project_date' => $this->dateString($project->project_date),
+            'status' => $project->currentStatus()->value,
+            'mandays' => $project->mandays,
+            'customers' => $project->customers->map(fn (Customer $customer): array => $this->customerPayload($customer))->values()->all(),
+            'pm' => $project->pm ? $this->userOption($project->pm) : null,
+            'incentive_profile' => $project->incentiveProfile ? [
+                'id' => $project->incentiveProfile->id,
+                'code' => $project->incentiveProfile->code,
+                'name' => $project->incentiveProfile->name,
+                'version' => $project->incentiveProfile->version,
+            ] : null,
+            'tasks_count' => $project->tasks_count ?? 0,
+            'members_count' => $project->members_count ?? 0,
+            'actions' => $this->actions($project),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function detail(Project $project): array
+    {
+        return [
+            ...$this->summary($project),
+            'location' => $project->location,
+            'urs_date' => $this->dateString($project->urs_date),
+            'urs_number' => $project->urs_number,
+            'plan_start_date' => $this->dateString($project->plan_start_date),
+            'plan_end_date' => $this->dateString($project->plan_end_date),
+            'actual_start_date' => $this->dateString($project->actual_start_date),
+            'actual_end_date' => $this->dateString($project->actual_end_date),
+            'uat_date' => $this->dateString($project->uat_date),
+            'bast_date' => $this->dateString($project->bast_date),
+            'rejection_notes' => $project->rejection_notes,
+            'requester' => $project->requester ? $this->userOption($project->requester) : null,
+            'members' => $project->members->map(fn ($member): array => [
+                'id' => $member->id,
+                'user' => $member->user ? $this->userOption($member->user) : null,
+                'project_role_code' => $member->project_role_code,
+                'project_role_name' => $member->project_role_name,
+                'pic_level_code' => $member->pic_level_code,
+                'pic_level_name' => $member->pic_level_name,
+                'is_support' => $member->is_support,
+            ])->values()->all(),
+            'tasks' => $project->tasks->map(fn (ProjectTask $task): array => [
+                'id' => $task->id,
+                'name' => $task->name,
+                'status' => $this->taskStatusValue($task),
+                'plan_start_date' => $this->dateString($task->plan_start_date),
+                'plan_end_date' => $this->dateString($task->plan_end_date),
+                'pic' => $task->member?->user ? $this->userOption($task->member->user) : null,
+            ])->values()->all(),
+            'attachments' => $project->attachments->map(fn (Attachment $attachment): array => [
+                'id' => $attachment->id,
+                'collection' => $this->attachmentCollectionValue($attachment),
+                'original_name' => $attachment->original_name,
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * @return array<string, bool>
+     */
+    private function actions(Project $project): array
+    {
+        $status = $project->currentStatus();
+
+        return [
+            'can_edit_basic' => in_array($status, [ProjectStatus::Draft, ProjectStatus::Rejected], true),
+            'can_prepare' => $status !== ProjectStatus::Closed,
+            'can_submit' => $status === ProjectStatus::Draft,
+            'can_resubmit' => $status === ProjectStatus::Rejected,
+            'can_start' => $status === ProjectStatus::Planning,
+            'can_refresh' => in_array($status, [ProjectStatus::Planning, ProjectStatus::Ongoing, ProjectStatus::AwaitingBast], true),
+            'can_close' => $status === ProjectStatus::ReadyToClose,
+        ];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function statusMetrics(): array
+    {
+        $counts = Project::query()
+            ->select('status', DB::raw('count(*) as aggregate'))
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        return collect(ProjectStatus::cases())
+            ->mapWithKeys(fn (ProjectStatus $status): array => [
+                $status->value => (int) ($counts[$status->value] ?? 0),
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function options(): array
+    {
+        return [
+            'statuses' => collect(ProjectStatus::cases())
+                ->map(fn (ProjectStatus $status): array => [
+                    'value' => $status->value,
+                    'label' => str($status->value)->replace('_', ' ')->headline()->toString(),
+                ])
+                ->all(),
+            'customers' => Customer::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'company_name']),
+            'users' => User::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'external_id']),
+            'incentive_profiles' => IncentiveProfile::query()
+                ->where('status', IncentiveProfileStatus::Active->value)
+                ->orderBy('code')
+                ->get(['id', 'code', 'name', 'version']),
+        ];
+    }
+
+    private function loadProject(Project $project): Project
+    {
+        return $project->load([
+            'customers',
+            'pm',
+            'requester',
+            'incentiveProfile',
+            'members.user',
+            'tasks.member.user',
+            'attachments',
+        ])->loadCount(['tasks', 'members']);
+    }
+
+    /**
+     * @return array{id: int, name: string, email: string, external_id: ?string}
+     */
+    private function userOption(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'external_id' => $user->external_id,
+        ];
+    }
+
+    /**
+     * @return array{id: int, name: string, company_name: ?string, is_primary: bool}
+     */
+    private function customerPayload(Customer $customer): array
+    {
+        $pivot = $customer->getRelationValue('pivot');
+
+        return [
+            'id' => $customer->id,
+            'name' => $customer->name,
+            'company_name' => $customer->company_name,
+            'is_primary' => $pivot instanceof Pivot && (bool) $pivot->getAttribute('is_primary'),
+        ];
+    }
+
+    private function taskStatusValue(ProjectTask $task): string
+    {
+        $status = $task->getAttribute('status');
+
+        if ($status instanceof TaskStatus) {
+            return $status->value;
+        }
+
+        return (string) $status;
+    }
+
+    private function attachmentCollectionValue(Attachment $attachment): string
+    {
+        $collection = $attachment->getAttribute('collection');
+
+        if ($collection instanceof AttachmentCollection) {
+            return $collection->value;
+        }
+
+        return (string) $collection;
+    }
+
+    private function actor(Request $request): User
+    {
+        $user = $request->user();
+
+        abort_unless($user instanceof User, 401);
+
+        return $user;
+    }
+
+    private function dateString(mixed $value): ?string
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        return $value === null ? null : (string) $value;
+    }
+}
