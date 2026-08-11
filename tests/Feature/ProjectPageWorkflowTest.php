@@ -13,6 +13,7 @@ use App\Models\IncentiveProfile;
 use App\Models\IncentiveProjectRoleRule;
 use App\Models\Project;
 use App\Models\ProjectMember;
+use App\Models\ProjectTask;
 use App\Models\TaskType;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
@@ -93,6 +94,7 @@ class ProjectPageWorkflowTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('project-preparations/index')
+                ->has('projects', 3)
                 ->where('columns.0.status', ProjectStatus::Draft->value)
                 ->where('columns.1.status', ProjectStatus::PendingApproval->value)
                 ->where('columns.2.status', ProjectStatus::Rejected->value)
@@ -326,6 +328,242 @@ class ProjectPageWorkflowTest extends TestCase
 
         $this->assertSame(ProjectStatus::Closed, $project->status);
         $this->assertSame(now()->toDateString(), $project->actual_end_date?->toDateString());
+    }
+
+    public function test_project_status_move_starts_project_and_records_history(): void
+    {
+        Storage::fake('local');
+
+        $user = $this->userWithPermissions(['manage_projects']);
+        $project = $this->preparedProject($user);
+        $project->update([
+            'status' => ProjectStatus::Planning,
+            'uat_date' => '2026-08-18',
+        ]);
+        Attachment::factory()->create([
+            'attachable_type' => Project::class,
+            'attachable_id' => $project->id,
+            'collection' => AttachmentCollection::UatFile,
+            'uploaded_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('projects.status-move', $project), [
+                'target_status' => ProjectStatus::Ongoing->value,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $project->refresh();
+
+        $this->assertSame(ProjectStatus::Ongoing, $project->status);
+        $this->assertDatabaseHas('project_status_histories', [
+            'project_id' => $project->id,
+            'from_status' => ProjectStatus::Planning->value,
+            'to_status' => ProjectStatus::Ongoing->value,
+            'source' => 'drag',
+        ]);
+    }
+
+    public function test_project_status_move_back_one_step_requires_reason(): void
+    {
+        $user = $this->userWithPermissions(['manage_projects']);
+        $project = Project::factory()->create(['status' => ProjectStatus::Ongoing]);
+
+        $this->actingAs($user)
+            ->patch(route('projects.status-move', $project), [
+                'target_status' => ProjectStatus::Planning->value,
+            ])
+            ->assertSessionHasErrors('reason');
+
+        $this->actingAs($user)
+            ->patch(route('projects.status-move', $project), [
+                'target_status' => ProjectStatus::Planning->value,
+                'reason' => 'Timeline needs re-planning.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $project->refresh();
+
+        $this->assertSame(ProjectStatus::Planning, $project->status);
+        $this->assertDatabaseHas('project_status_histories', [
+            'project_id' => $project->id,
+            'from_status' => ProjectStatus::Ongoing->value,
+            'to_status' => ProjectStatus::Planning->value,
+            'reason' => 'Timeline needs re-planning.',
+        ]);
+    }
+
+    public function test_project_status_move_rejects_multi_step_and_closed_rollback(): void
+    {
+        $user = $this->userWithPermissions(['manage_projects']);
+        $readyProject = Project::factory()->create(['status' => ProjectStatus::ReadyToClose]);
+        $closedProject = Project::factory()->create(['status' => ProjectStatus::Closed]);
+
+        $this->actingAs($user)
+            ->patch(route('projects.status-move', $readyProject), [
+                'target_status' => ProjectStatus::Ongoing->value,
+                'reason' => 'Too far.',
+            ])
+            ->assertSessionHasErrors('target_status');
+
+        $this->actingAs($user)
+            ->patch(route('projects.status-move', $closedProject), [
+                'target_status' => ProjectStatus::ReadyToClose->value,
+                'reason' => 'Reopen.',
+            ])
+            ->assertSessionHasErrors('target_status');
+    }
+
+    public function test_project_task_type_crud_is_scoped_to_project(): void
+    {
+        $user = $this->userWithPermissions(['manage_tasks']);
+        $project = Project::factory()->create();
+
+        $this->actingAs($user)
+            ->post(route('projects.task-types.store', $project), [
+                'name' => 'Architecture',
+                'color' => '#0a57a4',
+                'description' => 'Architecture label',
+                'is_active' => true,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $taskType = TaskType::query()->where('name', 'Architecture')->firstOrFail();
+
+        $this->assertSame($project->id, $taskType->project_id);
+
+        $this->actingAs($user)
+            ->patch(route('projects.task-types.update', [$project, $taskType]), [
+                'name' => 'Development',
+                'color' => '#16a34a',
+                'description' => 'Development label',
+                'is_active' => false,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('task_types', [
+            'id' => $taskType->id,
+            'project_id' => $project->id,
+            'name' => 'Development',
+            'is_active' => false,
+        ]);
+
+        $this->actingAs($user)
+            ->delete(route('projects.task-types.destroy', [$project, $taskType]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('task_types', [
+            'id' => $taskType->id,
+        ]);
+    }
+
+    public function test_project_and_bulk_project_delete_routes_require_manage_permission(): void
+    {
+        $user = $this->userWithPermissions(['view_projects', 'manage_projects']);
+        $firstProject = Project::factory()->create(['name' => 'Delete Project A']);
+        $secondProject = Project::factory()->create(['name' => 'Delete Project B']);
+        $thirdProject = Project::factory()->create(['name' => 'Delete Project C']);
+
+        $this->actingAs($user)
+            ->delete(route('projects.destroy', $firstProject))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('projects', [
+            'id' => $firstProject->id,
+        ]);
+
+        $this->actingAs($user)
+            ->delete(route('projects.bulk-delete'), [
+                'project_ids' => [$secondProject->id, $thirdProject->id],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('projects', [
+            'id' => $secondProject->id,
+        ]);
+        $this->assertDatabaseMissing('projects', [
+            'id' => $thirdProject->id,
+        ]);
+    }
+
+    public function test_bulk_task_create_page_and_store_create_multiple_tasks(): void
+    {
+        $user = $this->userWithPermissions(['manage_tasks']);
+        $project = $this->preparedProject($user);
+        $taskType = TaskType::factory()->create(['project_id' => $project->id]);
+        $member = $project->members()->firstOrFail();
+
+        $this->actingAs($user)
+            ->get(route('projects.tasks.create', $project))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('projects/tasks/create')
+                ->where('project.id', $project->id));
+
+        $this->actingAs($user)
+            ->post(route('projects.tasks.bulk-store', $project), [
+                'tasks' => [
+                    [
+                        'name' => 'Bulk Task 1',
+                        'task_type_id' => $taskType->id,
+                        'pic_user_id' => $member->user_id,
+                        'description' => 'First bulk task',
+                        'plan_start_date' => '2026-08-14',
+                        'plan_end_date' => '2026-08-15',
+                    ],
+                    [
+                        'name' => 'Bulk Task 2',
+                        'task_type_id' => '',
+                        'pic_user_id' => '',
+                        'description' => null,
+                        'plan_start_date' => '2026-08-16',
+                        'plan_end_date' => '2026-08-17',
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('projects.preparation.show', $project));
+
+        $this->assertDatabaseHas('project_tasks', [
+            'project_id' => $project->id,
+            'name' => 'Bulk Task 1',
+            'status' => TaskStatus::Todo->value,
+            'task_type_id' => $taskType->id,
+        ]);
+        $this->assertDatabaseHas('project_tasks', [
+            'project_id' => $project->id,
+            'name' => 'Bulk Task 2',
+            'status' => TaskStatus::Todo->value,
+        ]);
+    }
+
+    public function test_task_delete_and_bulk_delete_routes(): void
+    {
+        $user = $this->userWithPermissions(['manage_tasks']);
+        $project = Project::factory()->create();
+        $firstTask = ProjectTask::factory()->create(['project_id' => $project->id]);
+        $secondTask = ProjectTask::factory()->create(['project_id' => $project->id]);
+        $thirdTask = ProjectTask::factory()->create(['project_id' => $project->id]);
+
+        $this->actingAs($user)
+            ->delete(route('tasks.destroy', $firstTask))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('project_tasks', [
+            'id' => $firstTask->id,
+        ]);
+
+        $this->actingAs($user)
+            ->delete(route('tasks.bulk-delete'), [
+                'task_ids' => [$secondTask->id, $thirdTask->id],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('project_tasks', [
+            'id' => $secondTask->id,
+        ]);
+        $this->assertDatabaseMissing('project_tasks', [
+            'id' => $thirdTask->id,
+        ]);
     }
 
     public function test_task_board_is_scoped_to_visible_tasks(): void

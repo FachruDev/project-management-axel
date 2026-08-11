@@ -10,7 +10,6 @@ import {
 } from '@/actions/App/Http/Controllers/ProjectController';
 import { show as preparationShow } from '@/actions/App/Http/Controllers/ProjectPreparationController';
 import preparationIndex from '@/actions/App/Http/Controllers/ProjectPreparationIndexController';
-import { KanbanBoard, KanbanCard, KanbanLane } from '@/components/kanban';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { ProjectStatusBadge } from '@/components/project-status-badge';
@@ -19,7 +18,6 @@ import type {
     CustomerProjectOption,
     IncentiveProfileOption,
     ProjectPreparationIndexProps,
-    ProjectStatus,
     ProjectSummary,
 } from '@/types';
 
@@ -44,24 +42,15 @@ const blankProject: ProjectPayload = {
 const inputClass =
     'rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary';
 
-const laneTone: Record<ProjectStatus, string> = {
-    draft: 'border-slate-200 bg-pastel-slate text-slate-700',
-    pending_approval: 'border-amber-200 bg-pastel-amber text-amber-800',
-    rejected: 'border-red-200 bg-pastel-red text-red-700',
-    planning: 'border-blue-200 bg-pastel-blue text-primary',
-    ongoing: 'border-emerald-200 bg-pastel-green text-emerald-700',
-    awaiting_bast: 'border-purple-200 bg-pastel-purple text-purple-700',
-    ready_to_close: 'border-amber-200 bg-pastel-amber text-amber-800',
-    closed: 'border-slate-300 bg-white text-slate-700',
-};
-
 export default function ProjectPreparationIndex({
-    columns,
+    projects,
     filters,
     options,
 }: ProjectPreparationIndexProps) {
     const [search, setSearch] = useState(filters.search);
     const [status, setStatus] = useState(filters.status);
+    const [customerId, setCustomerId] = useState(filters.customer_id);
+    const [pmUserId, setPmUserId] = useState(filters.pm_user_id);
     const [editing, setEditing] = useState<ProjectSummary | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     const [customerSearch, setCustomerSearch] = useState('');
@@ -74,7 +63,7 @@ export default function ProjectPreparationIndex({
 
         router.get(
             preparationIndex.url(),
-            { search, status },
+            { search, status, customer_id: customerId, pm_user_id: pmUserId },
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -168,7 +157,7 @@ export default function ProjectPreparationIndex({
 
             <form
                 onSubmit={submitFilters}
-                className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-[1fr_220px_auto]"
+                className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 xl:grid-cols-[1fr_180px_220px_220px_auto]"
             >
                 <input
                     value={search}
@@ -188,6 +177,30 @@ export default function ProjectPreparationIndex({
                         </option>
                     ))}
                 </select>
+                <select
+                    value={customerId}
+                    onChange={(event) => setCustomerId(event.target.value)}
+                    className={inputClass}
+                >
+                    <option value="">All Customers</option>
+                    {options.customers.map((customer) => (
+                        <option key={customer.id} value={customer.id}>
+                            {customer.name}
+                        </option>
+                    ))}
+                </select>
+                <select
+                    value={pmUserId}
+                    onChange={(event) => setPmUserId(event.target.value)}
+                    className={inputClass}
+                >
+                    <option value="">All PM</option>
+                    {options.users.map((user) => (
+                        <option key={user.id} value={user.id}>
+                            {user.name}
+                        </option>
+                    ))}
+                </select>
                 <button
                     type="submit"
                     className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-pastel-blue"
@@ -196,18 +209,24 @@ export default function ProjectPreparationIndex({
                 </button>
             </form>
 
-            <KanbanBoard>
-                {columns.map((column) => (
-                    <KanbanLane
-                        key={column.status}
-                        title={column.label}
-                        count={column.projects.length}
-                        tone={laneTone[column.status]}
-                    >
-                        {column.projects.map((project) => (
-                            <KanbanCard key={project.id}>
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
+            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead className="bg-pastel-slate text-left text-xs font-semibold uppercase text-slate-600">
+                            <tr>
+                                <th className="px-4 py-3">Project</th>
+                                <th className="px-4 py-3">Customer</th>
+                                <th className="px-4 py-3">Status</th>
+                                <th className="px-4 py-3">PM</th>
+                                <th className="px-4 py-3">Incentive</th>
+                                <th className="px-4 py-3">Team</th>
+                                <th className="px-4 py-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {projects.map((project) => (
+                                <tr key={project.id} className="align-top hover:bg-slate-50">
+                                    <td className="px-4 py-4">
                                         <Link
                                             href={preparationShow.url(project.id)}
                                             className="font-semibold text-slate-950 hover:text-primary"
@@ -215,85 +234,92 @@ export default function ProjectPreparationIndex({
                                             {project.name}
                                         </Link>
                                         <div className="mt-1 text-xs text-slate-500">
-                                            {project.customers[0]?.name ?? 'No customer'} /{' '}
-                                            {project.mandays} MD
+                                            {project.project_date} / {project.mandays} MD
                                         </div>
-                                    </div>
-                                    <ProjectStatusBadge status={project.status} />
-                                </div>
-                                <div className="mt-4 grid gap-2 text-xs text-slate-600">
-                                    <div className="flex justify-between gap-3">
-                                        <span>PM</span>
-                                        <span className="font-medium text-slate-800">
-                                            {project.pm?.name ?? '-'}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between gap-3">
-                                        <span>Members</span>
-                                        <span className="font-medium text-slate-800">
-                                            {project.members_count}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between gap-3">
-                                        <span>Tasks</span>
-                                        <span className="font-medium text-slate-800">
-                                            {project.tasks_count}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                                    {project.actions.can_edit_basic && (
-                                        <button
-                                            type="button"
-                                            onClick={() => openEdit(project)}
-                                            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
-                                        >
-                                            Edit
-                                        </button>
-                                    )}
-                                    <Link
-                                        href={show.url(project.id)}
-                                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                                    </td>
+                                    <td className="px-4 py-4 text-slate-600">
+                                        {project.customers[0]?.name ?? '-'}
+                                    </td>
+                                    <td className="px-4 py-4">
+                                        <ProjectStatusBadge status={project.status} />
+                                    </td>
+                                    <td className="px-4 py-4 text-slate-600">
+                                        {project.pm?.name ?? '-'}
+                                    </td>
+                                    <td className="px-4 py-4 text-slate-600">
+                                        {project.incentive_profile
+                                            ? `${project.incentive_profile.code} v${project.incentive_profile.version}`
+                                            : '-'}
+                                    </td>
+                                    <td className="px-4 py-4 text-slate-600">
+                                        {project.members_count} member / {project.tasks_count}{' '}
+                                        task
+                                    </td>
+                                    <td className="px-4 py-4">
+                                        <div className="flex justify-end gap-2">
+                                            {project.actions.can_edit_basic && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openEdit(project)}
+                                                    className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                                                >
+                                                    Edit
+                                                </button>
+                                            )}
+                                            <Link
+                                                href={show.url(project.id)}
+                                                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                                            >
+                                                Detail
+                                            </Link>
+                                            <Link
+                                                href={preparationShow.url(project.id)}
+                                                className="rounded-md border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-pastel-blue"
+                                            >
+                                                Prepare
+                                            </Link>
+                                            {project.actions.can_submit && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        postAction(
+                                                            submitApproval.url(project.id),
+                                                        )
+                                                    }
+                                                    className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90"
+                                                >
+                                                    Submit
+                                                </button>
+                                            )}
+                                            {project.actions.can_resubmit && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        postAction(resubmit.url(project.id))
+                                                    }
+                                                    className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90"
+                                                >
+                                                    Resubmit
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                            {projects.length === 0 && (
+                                <tr>
+                                    <td
+                                        colSpan={7}
+                                        className="px-4 py-10 text-center text-sm text-slate-500"
                                     >
-                                        Detail
-                                    </Link>
-                                    <Link
-                                        href={preparationShow.url(project.id)}
-                                        className="rounded-md border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-pastel-blue"
-                                    >
-                                        Prepare
-                                    </Link>
-                                    {project.actions.can_submit && (
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                postAction(submitApproval.url(project.id))
-                                            }
-                                            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90"
-                                        >
-                                            Submit
-                                        </button>
-                                    )}
-                                    {project.actions.can_resubmit && (
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                postAction(resubmit.url(project.id))
-                                            }
-                                            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90"
-                                        >
-                                            Resubmit
-                                        </button>
-                                    )}
-                                </div>
-                            </KanbanCard>
-                        ))}
-                        {column.projects.length === 0 && (
-                            <EmptyLane>No project in this lane.</EmptyLane>
-                        )}
-                    </KanbanLane>
-                ))}
-            </KanbanBoard>
+                                        No preparation project found.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
             <Modal
                 open={modalOpen}

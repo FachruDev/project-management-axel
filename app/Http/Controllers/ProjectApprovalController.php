@@ -21,19 +21,35 @@ class ProjectApprovalController extends Controller
         private readonly ProjectLifecycleService $lifecycleService,
     ) {}
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $filter = $request->string('filter')->trim()->toString();
+        $filter = in_array($filter, ['pending', 'rejected', 'approved', 'all'], true) ? $filter : 'pending';
+
         $projects = Project::query()
-            ->with(['customers', 'pm', 'requester'])
+            ->with(['customers', 'pm', 'requester', 'approver', 'rejector'])
             ->withCount(['tasks', 'members'])
-            ->where('status', ProjectStatus::PendingApproval->value)
+            ->when($filter === 'pending', fn ($query) => $query->where('status', ProjectStatus::PendingApproval->value))
+            ->when($filter === 'rejected', fn ($query) => $query->where('status', ProjectStatus::Rejected->value))
+            ->when($filter === 'approved', fn ($query) => $query->whereNotNull('approved_at'))
+            ->when($filter === 'all', fn ($query) => $query->where(function ($query): void {
+                $query->where('status', ProjectStatus::PendingApproval->value)
+                    ->orWhere('status', ProjectStatus::Rejected->value)
+                    ->orWhereNotNull('approved_at');
+            }))
             ->latest('approval_requested_at')
+            ->latest('updated_at')
             ->paginate(10)
+            ->withQueryString()
             ->through(fn (Project $project): array => [
                 'id' => $project->id,
                 'name' => $project->name,
+                'status' => $project->currentStatus()->value,
                 'project_date' => $this->dateString($project->project_date),
                 'approval_requested_at' => $this->dateString($project->approval_requested_at),
+                'approved_at' => $this->dateString($project->approved_at),
+                'rejected_at' => $this->dateString($project->rejected_at),
+                'rejection_notes' => $project->rejection_notes,
                 'customers' => $project->customers->map(fn (Customer $customer): array => [
                     'id' => $customer->id,
                     'name' => $customer->name,
@@ -41,12 +57,23 @@ class ProjectApprovalController extends Controller
                 ])->values()->all(),
                 'pm' => $project->pm ? $this->userOption($project->pm) : null,
                 'requester' => $project->requester ? $this->userOption($project->requester) : null,
+                'approver' => $project->approver ? $this->userOption($project->approver) : null,
+                'rejector' => $project->rejector ? $this->userOption($project->rejector) : null,
                 'members_count' => $project->members_count ?? 0,
                 'tasks_count' => $project->tasks_count ?? 0,
             ]);
 
         return Inertia::render('project-approvals/index', [
             'projects' => $projects,
+            'filters' => [
+                'filter' => $filter,
+            ],
+            'filter_options' => [
+                ['value' => 'pending', 'label' => 'Pending Approval'],
+                ['value' => 'rejected', 'label' => 'Rejected'],
+                ['value' => 'approved', 'label' => 'Approved'],
+                ['value' => 'all', 'label' => 'All'],
+            ],
         ]);
     }
 

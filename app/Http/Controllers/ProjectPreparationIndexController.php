@@ -24,6 +24,8 @@ class ProjectPreparationIndexController extends Controller
     {
         $search = $request->string('search')->trim()->toString();
         $status = $request->string('status')->trim()->toString();
+        $customerId = $request->string('customer_id')->trim()->toString();
+        $pmUserId = $request->string('pm_user_id')->trim()->toString();
         $user = $this->actor($request);
 
         $projects = $this->visibility->visibleProjects(Project::query(), $user)
@@ -32,6 +34,8 @@ class ProjectPreparationIndexController extends Controller
             ->whereIn('status', $this->preparationStatuses())
             ->when($search !== '', fn ($query) => $query->where('name', 'like', "%{$search}%"))
             ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($customerId !== '', fn ($query) => $query->whereHas('customers', fn ($query) => $query->whereKey($customerId)))
+            ->when($pmUserId !== '', fn ($query) => $query->where('pm_user_id', $pmUserId))
             ->latest('updated_at')
             ->get()
             ->map(fn (Project $project): array => [
@@ -70,6 +74,7 @@ class ProjectPreparationIndexController extends Controller
             ]);
 
         return Inertia::render('project-preparations/index', [
+            'projects' => $projects->values()->all(),
             'columns' => collect($this->preparationStatuses())
                 ->map(fn (ProjectStatus $status): array => [
                     'status' => $status->value,
@@ -80,6 +85,8 @@ class ProjectPreparationIndexController extends Controller
             'filters' => [
                 'search' => $search,
                 'status' => $status,
+                'customer_id' => $customerId,
+                'pm_user_id' => $pmUserId,
             ],
             'options' => [
                 'statuses' => collect($this->preparationStatuses())
@@ -92,6 +99,10 @@ class ProjectPreparationIndexController extends Controller
                     ->where('is_active', true)
                     ->orderBy('name')
                     ->get(['id', 'name', 'email', 'company_name']),
+                'users' => User::query()
+                    ->where('is_active', true)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'email', 'external_id']),
                 'incentive_profiles' => IncentiveProfile::query()
                     ->where('status', IncentiveProfileStatus::Active->value)
                     ->orderBy('code')

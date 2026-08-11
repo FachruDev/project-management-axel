@@ -61,6 +61,7 @@ export type ProjectSummary = {
     project_date: string;
     status: ProjectStatus;
     mandays: string;
+    location: string | null;
     plan_start_date: string | null;
     plan_end_date: string | null;
     actual_start_date: string | null;
@@ -136,8 +137,11 @@ export type ProjectIndexProps = {
 export type PreparationProject = {
     id: number;
     name: string;
+    project_date: string;
     status: ProjectStatus;
+    mandays: string;
     incentive_profile_id: number | null;
+    incentive_profile: IncentiveProfileOption | null;
     pm_user_id: number | null;
     request_user_id: number | null;
     location: string | null;
@@ -147,6 +151,7 @@ export type PreparationProject = {
     plan_end_date: string | null;
     uat_date: string | null;
     bast_date: string | null;
+    customers: CustomerProjectOption[];
     members: PreparationMember[];
     access_rules: PreparationAccessRule[];
     tasks: PreparationTask[];
@@ -186,11 +191,21 @@ export type PreparationTask = {
     task_type?: { id: number; name: string; color: string } | null;
 };
 
+export type ProjectTaskTypeOption = {
+    id: number;
+    project_id: number | null;
+    name: string;
+    color: string;
+    description?: string | null;
+    is_active?: boolean;
+    is_global?: boolean;
+};
+
 export type ProjectPreparationProps = {
     project: PreparationProject;
     options: {
         users: UserOption[];
-        task_types: Array<{ id: number; name: string; color: string }>;
+        task_types: ProjectTaskTypeOption[];
         task_statuses: Array<{ value: ProjectTaskStatus; label: string }>;
         project_role_rules: Array<{
             id: number;
@@ -210,17 +225,27 @@ export type ProjectPreparationProps = {
 export type ProjectApprovalSummary = {
     id: number;
     name: string;
+    status: ProjectStatus;
     project_date: string | null;
     approval_requested_at: string | null;
+    approved_at: string | null;
+    rejected_at: string | null;
+    rejection_notes: string | null;
     customers: CustomerProjectOption[];
     pm: UserOption | null;
     requester: UserOption | null;
+    approver: UserOption | null;
+    rejector: UserOption | null;
     members_count: number;
     tasks_count: number;
 };
 
 export type ProjectApprovalsProps = {
     projects: Paginated<ProjectApprovalSummary>;
+    filters: {
+        filter: string;
+    };
+    filter_options: Array<{ value: string; label: string }>;
 };
 
 export type TaskKanbanCard = {
@@ -238,10 +263,22 @@ export type TaskKanbanCard = {
         name: string;
         status: ProjectStatus;
         customer: string | null;
+        pm: UserOption | null;
     } | null;
     pic: UserOption | null;
     task_type: { id: number; name: string; color: string } | null;
     allowed_statuses: ProjectTaskStatus[];
+};
+
+export type ProjectBulkTaskCreateProps = {
+    project: {
+        id: number;
+        name: string;
+    };
+    options: {
+        members: Array<{ id: number; user_id: number; name: string }>;
+        task_types: Array<{ id: number; name: string; color: string }>;
+    };
 };
 
 export type TaskKanbanColumn = {
@@ -262,21 +299,25 @@ export type TaskBoardProps = {
     options: {
         projects: Array<{ id: number; name: string }>;
         users: UserOption[];
-        task_types: Array<{ id: number; name: string; color: string }>;
+        task_types: Array<{ id: number; project_id?: number | null; name: string; color: string }>;
         statuses: Array<{ value: ProjectTaskStatus; label: string }>;
         due_filters: Array<{ value: string; label: string }>;
     };
 };
 
 export type ProjectPreparationIndexProps = {
+    projects: ProjectSummary[];
     columns: ProjectKanbanColumn[];
     filters: {
         search: string;
         status: string;
+        customer_id: string;
+        pm_user_id: string;
     };
     options: {
         statuses: Array<{ value: ProjectStatus; label: string }>;
         customers: CustomerProjectOption[];
+        users: UserOption[];
         incentive_profiles: IncentiveProfileOption[];
     };
 };

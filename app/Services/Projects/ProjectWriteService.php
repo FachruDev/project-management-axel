@@ -11,6 +11,7 @@ use App\Models\IncentiveProjectRoleRule;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\ProjectTask;
+use App\Models\TaskType;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
@@ -203,7 +204,7 @@ class ProjectWriteService
                 ? null
                 : $membersByUserId->get((int) $task['pic_user_id']);
             $payload = [
-                'task_type_id' => $task['task_type_id'] ?? null,
+                'task_type_id' => $this->validatedTaskTypeId($project, $task['task_type_id'] ?? null),
                 'project_member_id' => $projectMember?->id,
                 'name' => $task['name'],
                 'status' => $status,
@@ -228,6 +229,29 @@ class ProjectWriteService
             $projectTask = $project->tasks()->create($payload);
             $this->storeTaskFiles($projectTask, Arr::wrap($task['attachments'] ?? []), $actor);
         }
+    }
+
+    private function validatedTaskTypeId(Project $project, mixed $taskTypeId): ?int
+    {
+        if (empty($taskTypeId)) {
+            return null;
+        }
+
+        $taskType = TaskType::query()
+            ->whereKey((int) $taskTypeId)
+            ->where(function ($query) use ($project): void {
+                $query->whereNull('project_id')
+                    ->orWhere('project_id', $project->id);
+            })
+            ->first();
+
+        if ($taskType instanceof TaskType) {
+            return $taskType->id;
+        }
+
+        throw ValidationException::withMessages([
+            'tasks' => ['Selected task type is not available for this project.'],
+        ]);
     }
 
     /**

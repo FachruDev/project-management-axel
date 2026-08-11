@@ -32,10 +32,12 @@ class ProjectPreparationController extends Controller
         $project = $project->load([
             'pm',
             'requester',
+            'customers',
             'incentiveProfile.projectRoleRules',
             'incentiveProfile.picLevelRules',
             'members.user',
             'accessRules.user',
+            'taskTypes',
             'tasks.taskType',
             'tasks.member.user',
             'tasks.attachments',
@@ -65,8 +67,16 @@ class ProjectPreparationController extends Controller
         return [
             'id' => $project->id,
             'name' => $project->name,
+            'project_date' => $this->dateString($project->project_date),
             'status' => $project->currentStatus()->value,
+            'mandays' => $project->mandays,
             'incentive_profile_id' => $project->incentive_profile_id,
+            'incentive_profile' => $project->incentiveProfile ? [
+                'id' => $project->incentiveProfile->id,
+                'code' => $project->incentiveProfile->code,
+                'name' => $project->incentiveProfile->name,
+                'version' => $project->incentiveProfile->version,
+            ] : null,
             'pm_user_id' => $project->pm_user_id,
             'request_user_id' => $project->request_user_id,
             'location' => $project->location,
@@ -76,6 +86,12 @@ class ProjectPreparationController extends Controller
             'plan_end_date' => $this->dateString($project->plan_end_date),
             'uat_date' => $this->dateString($project->uat_date),
             'bast_date' => $this->dateString($project->bast_date),
+            'customers' => $project->customers->map(fn ($customer): array => [
+                'id' => $customer->id,
+                'name' => $customer->name,
+                'email' => $customer->email,
+                'company_name' => $customer->company_name,
+            ])->values()->all(),
             'members' => $project->members->map(fn ($member): array => [
                 'id' => $member->id,
                 'user_id' => $member->user_id,
@@ -127,8 +143,23 @@ class ProjectPreparationController extends Controller
                 ->get(['id', 'name', 'email', 'external_id']),
             'task_types' => TaskType::query()
                 ->where('is_active', true)
+                ->where(function ($query) use ($project): void {
+                    $query->whereNull('project_id')
+                        ->orWhere('project_id', $project->id);
+                })
                 ->orderBy('name')
-                ->get(['id', 'name', 'color']),
+                ->get(['id', 'project_id', 'name', 'color', 'description', 'is_active'])
+                ->map(fn (TaskType $taskType): array => [
+                    'id' => $taskType->id,
+                    'project_id' => $taskType->project_id,
+                    'name' => $taskType->name,
+                    'color' => $taskType->color,
+                    'description' => $taskType->description,
+                    'is_active' => $taskType->is_active,
+                    'is_global' => $taskType->project_id === null,
+                ])
+                ->values()
+                ->all(),
             'task_statuses' => collect(TaskStatus::cases())
                 ->map(fn (TaskStatus $status): array => [
                     'value' => $status->value,

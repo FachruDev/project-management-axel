@@ -104,6 +104,15 @@ class ProjectController extends Controller
             ->with('success', 'Project updated.');
     }
 
+    public function destroy(Request $request, Project $project): RedirectResponse
+    {
+        abort_unless($request->user()?->can('manage_projects') === true, 403);
+
+        $project->delete();
+
+        return back()->with('success', 'Project deleted.');
+    }
+
     public function submitApproval(Request $request, Project $project): RedirectResponse
     {
         try {
@@ -176,6 +185,7 @@ class ProjectController extends Controller
             'project_date' => $this->dateString($project->project_date),
             'status' => $project->currentStatus()->value,
             'mandays' => $project->mandays,
+            'location' => $project->location,
             'plan_start_date' => $this->dateString($project->plan_start_date),
             'plan_end_date' => $this->dateString($project->plan_end_date),
             'actual_start_date' => $this->dateString($project->actual_start_date),

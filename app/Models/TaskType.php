@@ -6,9 +6,10 @@ use Database\Factories\TaskTypeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'color', 'description', 'is_active'])]
+#[Fillable(['project_id', 'name', 'color', 'description', 'is_active'])]
 class TaskType extends Model
 {
     /** @use HasFactory<TaskTypeFactory> */
@@ -29,6 +30,14 @@ class TaskType extends Model
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * @return BelongsTo<Project, $this>
+     */
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 
     /**

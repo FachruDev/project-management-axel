@@ -117,6 +117,22 @@ class Project extends Model
     }
 
     /**
+     * @return BelongsTo<User, $this>
+     */
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function rejector(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    /**
      * @return BelongsToMany<Customer, $this>
      */
     public function customers(): BelongsToMany
@@ -148,6 +164,22 @@ class Project extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(ProjectTask::class);
+    }
+
+    /**
+     * @return HasMany<TaskType, $this>
+     */
+    public function taskTypes(): HasMany
+    {
+        return $this->hasMany(TaskType::class);
+    }
+
+    /**
+     * @return HasMany<ProjectStatusHistory, $this>
+     */
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(ProjectStatusHistory::class);
     }
 
     /**

@@ -31,7 +31,7 @@ class TaskBoardController extends Controller
         $due = $request->string('due')->trim()->toString();
 
         $tasks = $this->visibility->visibleTasks(ProjectTask::query(), $user)
-            ->with(['project.customers', 'member.user', 'taskType'])
+            ->with(['project.customers', 'project.pm', 'member.user', 'taskType'])
             ->withCount('attachments')
             ->when($search !== '', fn ($query) => $query->where('name', 'like', "%{$search}%"))
             ->when($projectId !== '', fn ($query) => $query->where('project_id', $projectId))
@@ -78,7 +78,7 @@ class TaskBoardController extends Controller
                 'task_types' => TaskType::query()
                     ->where('is_active', true)
                     ->orderBy('name')
-                    ->get(['id', 'name', 'color']),
+                    ->get(['id', 'project_id', 'name', 'color']),
                 'statuses' => collect(TaskStatus::cases())
                     ->map(fn (TaskStatus $status): array => [
                         'value' => $status->value,
@@ -114,6 +114,12 @@ class TaskBoardController extends Controller
                 'name' => $task->project->name,
                 'status' => $task->project->currentStatus()->value,
                 'customer' => $task->project->customers->first()?->name,
+                'pm' => $task->project->pm ? [
+                    'id' => $task->project->pm->id,
+                    'name' => $task->project->pm->name,
+                    'email' => $task->project->pm->email,
+                    'external_id' => $task->project->pm->external_id,
+                ] : null,
             ] : null,
             'pic' => $task->member?->user ? [
                 'id' => $task->member->user->id,

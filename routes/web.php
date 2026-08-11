@@ -6,10 +6,16 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\IncentiveProfileController;
 use App\Http\Controllers\ProjectApprovalController;
+use App\Http\Controllers\ProjectBulkDeleteController;
+use App\Http\Controllers\ProjectBulkTaskController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectPreparationController;
 use App\Http\Controllers\ProjectPreparationIndexController;
+use App\Http\Controllers\ProjectStatusMoveController;
+use App\Http\Controllers\ProjectTaskBulkDeleteController;
+use App\Http\Controllers\ProjectTaskDeleteController;
 use App\Http\Controllers\ProjectTaskStatusController;
+use App\Http\Controllers\ProjectTaskTypeController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\TaskBoardController;
 use App\Http\Controllers\UserController;
@@ -50,8 +56,29 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::post('projects/{project}/close', [ProjectController::class, 'close'])
         ->middleware('can:manage_projects')
         ->name('projects.close');
+    Route::patch('projects/{project}/status-move', ProjectStatusMoveController::class)
+        ->middleware('can:manage_projects')
+        ->name('projects.status-move');
+    Route::delete('projects/bulk-delete', ProjectBulkDeleteController::class)
+        ->middleware('can:manage_projects')
+        ->name('projects.bulk-delete');
+    Route::get('projects/{project}/tasks/create', [ProjectBulkTaskController::class, 'create'])
+        ->middleware('can:manage_tasks')
+        ->name('projects.tasks.create');
+    Route::post('projects/{project}/tasks/bulk', [ProjectBulkTaskController::class, 'store'])
+        ->middleware('can:manage_tasks')
+        ->name('projects.tasks.bulk-store');
+    Route::post('projects/{project}/task-types', [ProjectTaskTypeController::class, 'store'])
+        ->middleware('can:manage_tasks')
+        ->name('projects.task-types.store');
+    Route::patch('projects/{project}/task-types/{taskType}', [ProjectTaskTypeController::class, 'update'])
+        ->middleware('can:manage_tasks')
+        ->name('projects.task-types.update');
+    Route::delete('projects/{project}/task-types/{taskType}', [ProjectTaskTypeController::class, 'destroy'])
+        ->middleware('can:manage_tasks')
+        ->name('projects.task-types.destroy');
     Route::resource('projects', ProjectController::class)
-        ->only(['index', 'store', 'show', 'update'])
+        ->only(['index', 'store', 'show', 'update', 'destroy'])
         ->middleware('can:view_projects');
 
     Route::get('project-preparations', ProjectPreparationIndexController::class)
@@ -64,6 +91,12 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::patch('tasks/{task}/status', ProjectTaskStatusController::class)
         ->middleware('can:manage_tasks')
         ->name('tasks.status.update');
+    Route::delete('tasks/bulk-delete', ProjectTaskBulkDeleteController::class)
+        ->middleware('can:manage_tasks')
+        ->name('tasks.bulk-delete');
+    Route::delete('tasks/{task}', ProjectTaskDeleteController::class)
+        ->middleware('can:manage_tasks')
+        ->name('tasks.destroy');
 
     Route::post('incentive-profiles/{incentive_profile}/calculations', [IncentiveProfileController::class, 'calculateProjects'])
         ->middleware('can:calculate_project_incentives')
