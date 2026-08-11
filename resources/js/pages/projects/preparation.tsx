@@ -1,7 +1,9 @@
-import { Link, useForm, usePage } from '@inertiajs/react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
 import type { FormEvent, ReactNode } from 'react';
 import { index as projectIndex, show as projectShow } from '@/actions/App/Http/Controllers/ProjectController';
 import { update } from '@/actions/App/Http/Controllers/ProjectPreparationController';
+import updateTaskStatus from '@/actions/App/Http/Controllers/ProjectTaskStatusController';
+import { KanbanBoard, KanbanCard, KanbanLane } from '@/components/kanban';
 import { PageHeader } from '@/components/page-header';
 import { ProjectStatusBadge } from '@/components/project-status-badge';
 import { AppLayout } from '@/layouts/app-layout';
@@ -33,6 +35,14 @@ type PreparationPayload = {
 
 const inputClass =
     'rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary';
+
+const taskTone: Record<PreparationTask['status'], string> = {
+    todo: 'border-slate-200 bg-pastel-slate text-slate-700',
+    assigned: 'border-blue-200 bg-pastel-blue text-primary',
+    inprogress: 'border-amber-200 bg-pastel-amber text-amber-800',
+    done: 'border-emerald-200 bg-pastel-green text-emerald-700',
+    cancelled: 'border-red-200 bg-pastel-red text-red-700',
+};
 
 export default function ProjectPreparation({
     project,
@@ -88,6 +98,10 @@ export default function ProjectPreparation({
             project.status,
         ) || Boolean(form.data.uat_date);
     const showBast = Boolean(form.data.uat_date) || Boolean(project.attachments.uat_file?.length);
+    const taskColumns = options.task_statuses.map((statusOption) => ({
+        ...statusOption,
+        tasks: form.data.tasks.filter((task) => task.status === statusOption.value),
+    }));
 
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -123,6 +137,24 @@ export default function ProjectPreparation({
             form.data.tasks.map((task, taskIndex) =>
                 taskIndex === index ? value : task,
             ),
+        );
+    }
+
+    function patchTaskStatus(task: PreparationTask, status: PreparationTask['status']) {
+        if (!task.id) {
+            const taskIndex = form.data.tasks.indexOf(task);
+
+            if (taskIndex >= 0) {
+                setTask(taskIndex, { ...task, status });
+            }
+
+            return;
+        }
+
+        router.patch(
+            updateTaskStatus.url(task.id),
+            { status },
+            { preserveScroll: true },
         );
     }
 
@@ -531,152 +563,177 @@ export default function ProjectPreparation({
                         </button>
                     }
                 >
-                    <div className="space-y-3">
-                        {form.data.tasks.map((task, indexKey) => (
-                            <div
-                                key={`task-${task.id ?? indexKey}`}
-                                className="space-y-3 rounded-lg border border-slate-200 p-3"
+                    <KanbanBoard>
+                        {taskColumns.map((column) => (
+                            <KanbanLane
+                                key={column.value}
+                                title={column.label}
+                                count={column.tasks.length}
+                                tone={taskTone[column.value]}
                             >
-                                <div className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_140px]">
-                                    <input
-                                        value={task.name}
-                                        onChange={(event) =>
-                                            setTask(indexKey, {
-                                                ...task,
-                                                name: event.target.value,
-                                            })
-                                        }
-                                        placeholder="Task name"
-                                        className={inputClass}
-                                    />
-                                    <select
-                                        value={task.task_type_id ?? ''}
-                                        onChange={(event) =>
-                                            setTask(indexKey, {
-                                                ...task,
-                                                task_type_id: event.target.value,
-                                            })
-                                        }
-                                        className={inputClass}
-                                    >
-                                        <option value="">Task type</option>
-                                        {options.task_types.map((type) => (
-                                            <option key={type.id} value={type.id}>
-                                                {type.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <select
-                                        value={task.pic_user_id ?? ''}
-                                        onChange={(event) =>
-                                            setTask(indexKey, {
-                                                ...task,
-                                                pic_user_id: event.target.value,
-                                            })
-                                        }
-                                        className={inputClass}
-                                    >
-                                        <option value="">PIC</option>
-                                        {options.users
-                                            .filter((user) =>
-                                                memberUserIds.includes(String(user.id)),
-                                            )
-                                            .map((user) => (
-                                                <option key={user.id} value={user.id}>
-                                                    {user.name}
-                                                </option>
-                                            ))}
-                                    </select>
-                                    <select
-                                        value={task.status}
-                                        onChange={(event) =>
-                                            setTask(indexKey, {
-                                                ...task,
-                                                status: event.target.value as PreparationTask['status'],
-                                            })
-                                        }
-                                        className={inputClass}
-                                    >
-                                        {options.task_statuses.map((status) => (
-                                            <option key={status.value} value={status.value}>
-                                                {status.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="grid gap-3 md:grid-cols-2">
-                                    <input
-                                        type="date"
-                                        value={task.plan_start_date}
-                                        onChange={(event) =>
-                                            setTask(indexKey, {
-                                                ...task,
-                                                plan_start_date: event.target.value,
-                                            })
-                                        }
-                                        className={inputClass}
-                                    />
-                                    <input
-                                        type="date"
-                                        value={task.plan_end_date}
-                                        onChange={(event) =>
-                                            setTask(indexKey, {
-                                                ...task,
-                                                plan_end_date: event.target.value,
-                                            })
-                                        }
-                                        className={inputClass}
-                                    />
-                                </div>
-                                <textarea
-                                    value={task.description ?? ''}
-                                    onChange={(event) =>
-                                        setTask(indexKey, {
-                                            ...task,
-                                            description: event.target.value,
-                                        })
-                                    }
-                                    placeholder="Description"
-                                    className={`${inputClass} min-h-20`}
-                                />
-                                <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                                    <input
-                                        type="file"
-                                        multiple
-                                        onChange={(event) =>
-                                            setTask(indexKey, {
-                                                ...task,
-                                                attachments: Array.from(
-                                                    event.target.files ?? [],
-                                                ),
-                                            })
-                                        }
-                                        className={inputClass}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            form.setData(
-                                                'tasks',
-                                                form.data.tasks.filter(
-                                                    (_, taskIndex) =>
-                                                        taskIndex !== indexKey,
-                                                ),
-                                            )
-                                        }
-                                        className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-pastel-red"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            </div>
+                                {column.tasks.map((task) => {
+                                    const indexKey = form.data.tasks.indexOf(task);
+
+                                    return (
+                                        <KanbanCard key={`task-${task.id ?? indexKey}`}>
+                                            <div className="space-y-3">
+                                                <input
+                                                    value={task.name}
+                                                    onChange={(event) =>
+                                                        setTask(indexKey, {
+                                                            ...task,
+                                                            name: event.target.value,
+                                                        })
+                                                    }
+                                                    placeholder="Task name"
+                                                    className={inputClass}
+                                                />
+                                                <div className="grid gap-2">
+                                                    <select
+                                                        value={task.task_type_id ?? ''}
+                                                        onChange={(event) =>
+                                                            setTask(indexKey, {
+                                                                ...task,
+                                                                task_type_id:
+                                                                    event.target.value,
+                                                            })
+                                                        }
+                                                        className={inputClass}
+                                                    >
+                                                        <option value="">Task type</option>
+                                                        {options.task_types.map((type) => (
+                                                            <option
+                                                                key={type.id}
+                                                                value={type.id}
+                                                            >
+                                                                {type.name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <select
+                                                        value={task.pic_user_id ?? ''}
+                                                        onChange={(event) =>
+                                                            setTask(indexKey, {
+                                                                ...task,
+                                                                pic_user_id:
+                                                                    event.target.value,
+                                                            })
+                                                        }
+                                                        className={inputClass}
+                                                    >
+                                                        <option value="">PIC</option>
+                                                        {options.users
+                                                            .filter((user) =>
+                                                                memberUserIds.includes(
+                                                                    String(user.id),
+                                                                ),
+                                                            )
+                                                            .map((user) => (
+                                                                <option
+                                                                    key={user.id}
+                                                                    value={user.id}
+                                                                >
+                                                                    {user.name}
+                                                                </option>
+                                                            ))}
+                                                    </select>
+                                                </div>
+                                                <div className="grid gap-2">
+                                                    <input
+                                                        type="date"
+                                                        value={task.plan_start_date}
+                                                        onChange={(event) =>
+                                                            setTask(indexKey, {
+                                                                ...task,
+                                                                plan_start_date:
+                                                                    event.target.value,
+                                                            })
+                                                        }
+                                                        className={inputClass}
+                                                    />
+                                                    <input
+                                                        type="date"
+                                                        value={task.plan_end_date}
+                                                        onChange={(event) =>
+                                                            setTask(indexKey, {
+                                                                ...task,
+                                                                plan_end_date:
+                                                                    event.target.value,
+                                                            })
+                                                        }
+                                                        className={inputClass}
+                                                    />
+                                                </div>
+                                                <textarea
+                                                    value={task.description ?? ''}
+                                                    onChange={(event) =>
+                                                        setTask(indexKey, {
+                                                            ...task,
+                                                            description: event.target.value,
+                                                        })
+                                                    }
+                                                    placeholder="Description"
+                                                    className={`${inputClass} min-h-20`}
+                                                />
+                                                <input
+                                                    type="file"
+                                                    multiple
+                                                    onChange={(event) =>
+                                                        setTask(indexKey, {
+                                                            ...task,
+                                                            attachments: Array.from(
+                                                                event.target.files ?? [],
+                                                            ),
+                                                        })
+                                                    }
+                                                    className={inputClass}
+                                                />
+                                                <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                                                    {(task.allowed_statuses ?? [])
+                                                        .filter(
+                                                            (status) =>
+                                                                status !== task.status,
+                                                        )
+                                                        .map((status) => (
+                                                            <button
+                                                                key={status}
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    patchTaskStatus(task, status)
+                                                                }
+                                                                className="rounded-md border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-pastel-blue"
+                                                            >
+                                                                {status.replaceAll('_', ' ')}
+                                                            </button>
+                                                        ))}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            form.setData(
+                                                                'tasks',
+                                                                form.data.tasks.filter(
+                                                                    (_, taskIndex) =>
+                                                                        taskIndex !== indexKey,
+                                                                ),
+                                                            )
+                                                        }
+                                                        className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-pastel-red"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </KanbanCard>
+                                    );
+                                })}
+                                {column.tasks.length === 0 && (
+                                    <p className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-4 text-center text-sm text-slate-500">
+                                        No task in this lane.
+                                    </p>
+                                )}
+                            </KanbanLane>
                         ))}
-                        {form.data.tasks.length === 0 && (
-                            <p className="rounded-lg bg-pastel-slate p-4 text-sm text-slate-600">
-                                No task created yet.
-                            </p>
-                        )}
-                    </div>
+                    </KanbanBoard>
                 </Panel>
 
                 <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-slate-50/95 py-4">

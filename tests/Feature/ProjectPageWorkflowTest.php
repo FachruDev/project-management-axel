@@ -44,11 +44,75 @@ class ProjectPageWorkflowTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('projects/index')
-                ->has('projects.data'));
+                ->has('columns', 5));
 
         $this->actingAs($blockedUser)
             ->get(route('projects.index'))
             ->assertForbidden();
+    }
+
+    public function test_projects_kanban_only_shows_operational_statuses(): void
+    {
+        $user = $this->userWithPermissions(['view_projects']);
+
+        Project::factory()->create(['status' => ProjectStatus::Draft, 'pm_user_id' => $user->id]);
+        Project::factory()->create(['status' => ProjectStatus::PendingApproval, 'pm_user_id' => $user->id]);
+        Project::factory()->create(['status' => ProjectStatus::Rejected, 'pm_user_id' => $user->id]);
+        Project::factory()->create(['status' => ProjectStatus::Planning, 'pm_user_id' => $user->id]);
+        Project::factory()->create(['status' => ProjectStatus::Ongoing, 'pm_user_id' => $user->id]);
+        Project::factory()->create(['status' => ProjectStatus::Closed, 'pm_user_id' => $user->id]);
+
+        $this->actingAs($user)
+            ->get(route('projects.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('projects/index')
+                ->where('columns.0.status', ProjectStatus::Planning->value)
+                ->where('columns.1.status', ProjectStatus::Ongoing->value)
+                ->where('columns.4.status', ProjectStatus::Closed->value)
+                ->has('columns.0.projects', 1)
+                ->has('columns.1.projects', 1)
+                ->has('columns.4.projects', 1));
+    }
+
+    public function test_project_preparation_index_shows_preparation_statuses_and_create_redirects_to_preparation(): void
+    {
+        $user = $this->userWithPermissions(['manage_projects', 'view_projects']);
+        $customer = Customer::factory()->create();
+        $profile = IncentiveProfile::factory()->create([
+            'status' => IncentiveProfileStatus::Active,
+        ]);
+
+        Project::factory()->create(['status' => ProjectStatus::Draft, 'pm_user_id' => $user->id]);
+        Project::factory()->create(['status' => ProjectStatus::Rejected, 'pm_user_id' => $user->id]);
+        Project::factory()->create(['status' => ProjectStatus::PendingApproval, 'pm_user_id' => $user->id]);
+        Project::factory()->create(['status' => ProjectStatus::Planning, 'pm_user_id' => $user->id]);
+
+        $this->actingAs($user)
+            ->get(route('project-preparations.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('project-preparations/index')
+                ->where('columns.0.status', ProjectStatus::Draft->value)
+                ->where('columns.1.status', ProjectStatus::PendingApproval->value)
+                ->where('columns.2.status', ProjectStatus::Rejected->value)
+                ->has('columns.0.projects', 1)
+                ->has('columns.1.projects', 1)
+                ->has('columns.2.projects', 1));
+
+        $response = $this->actingAs($user)
+            ->post(route('projects.store', ['redirect_to' => 'preparation']), [
+                'name' => 'Preparation Draft',
+                'project_date' => '2026-08-11',
+                'customer_ids' => [$customer->id],
+                'primary_customer_id' => $customer->id,
+                'mandays' => 8,
+                'incentive_profile_id' => $profile->id,
+            ]);
+
+        $project = Project::query()->where('name', 'Preparation Draft')->firstOrFail();
+
+        $response->assertRedirect(route('projects.preparation.show', $project));
     }
 
     public function test_draft_project_can_be_created_from_project_payload(): void
@@ -262,6 +326,78 @@ class ProjectPageWorkflowTest extends TestCase
 
         $this->assertSame(ProjectStatus::Closed, $project->status);
         $this->assertSame(now()->toDateString(), $project->actual_end_date?->toDateString());
+    }
+
+    public function test_task_board_is_scoped_to_visible_tasks(): void
+    {
+        $user = $this->userWithPermissions(['view_tasks']);
+        $visibleProject = Project::factory()->create(['status' => ProjectStatus::Ongoing]);
+        $hiddenProject = Project::factory()->create(['status' => ProjectStatus::Ongoing]);
+        $visibleMember = ProjectMember::factory()->create([
+            'project_id' => $visibleProject->id,
+            'user_id' => $user->id,
+        ]);
+        $hiddenMember = ProjectMember::factory()->create([
+            'project_id' => $hiddenProject->id,
+        ]);
+
+        $visibleProject->tasks()->create([
+            'project_member_id' => $visibleMember->id,
+            'name' => 'Visible Scoped Task',
+            'status' => TaskStatus::Assigned,
+            'plan_start_date' => '2026-08-13',
+            'plan_end_date' => '2026-08-15',
+        ]);
+        $hiddenProject->tasks()->create([
+            'project_member_id' => $hiddenMember->id,
+            'name' => 'Hidden Scoped Task',
+            'status' => TaskStatus::Assigned,
+            'plan_start_date' => '2026-08-13',
+            'plan_end_date' => '2026-08-15',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('tasks.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('tasks/index')
+                ->has('columns', 5)
+                ->has('columns.1.tasks', 1)
+                ->where('columns.1.tasks.0.name', 'Visible Scoped Task'));
+    }
+
+    public function test_task_status_action_uses_controlled_transitions(): void
+    {
+        $user = $this->userWithPermissions(['manage_tasks']);
+        $project = Project::factory()->create(['status' => ProjectStatus::Ongoing]);
+        $member = ProjectMember::factory()->create([
+            'project_id' => $project->id,
+            'user_id' => $user->id,
+        ]);
+        $task = $project->tasks()->create([
+            'project_member_id' => $member->id,
+            'name' => 'Controlled Task',
+            'status' => TaskStatus::Assigned,
+            'plan_start_date' => '2026-08-13',
+            'plan_end_date' => '2026-08-15',
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('tasks.status.update', $task), [
+                'status' => TaskStatus::InProgress->value,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::InProgress, $task->status);
+        $this->assertNotNull($task->actual_start_date);
+
+        $this->actingAs($user)
+            ->patch(route('tasks.status.update', $task), [
+                'status' => TaskStatus::Todo->value,
+            ])
+            ->assertSessionHasErrors('status');
     }
 
     /**

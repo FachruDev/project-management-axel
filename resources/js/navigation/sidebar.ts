@@ -4,6 +4,8 @@ import { index as incentiveProfilesIndex } from '@/actions/App/Http/Controllers/
 import { index as projectApprovalsIndex } from '@/actions/App/Http/Controllers/ProjectApprovalController';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/ProjectController';
 import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
+import projectPreparationsIndex from '@/actions/App/Http/Controllers/ProjectPreparationIndexController';
+import tasksIndex from '@/actions/App/Http/Controllers/TaskBoardController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
 import { home } from '@/routes';
 
@@ -26,6 +28,13 @@ export const sidebarItems: SidebarItem[] = [
         label: 'Projects',
         section: 'Project',
         href: projectsIndex.url(),
+        permission: 'view_projects',
+        status: 'ready',
+    },
+    {
+        label: 'Project Preparation',
+        section: 'Project',
+        href: projectPreparationsIndex.url(),
         permission: 'manage_projects',
         status: 'ready',
     },
@@ -39,9 +48,9 @@ export const sidebarItems: SidebarItem[] = [
     {
         label: 'Tasks',
         section: 'Project',
-        href: projectsIndex.url(),
-        permission: 'manage_tasks',
-        status: 'planned',
+        href: tasksIndex.url(),
+        permission: 'view_tasks',
+        status: 'ready',
     },
     {
         label: 'Incentive Profiles',

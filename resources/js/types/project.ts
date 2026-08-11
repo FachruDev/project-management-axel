@@ -60,12 +60,23 @@ export type ProjectSummary = {
     project_date: string;
     status: ProjectStatus;
     mandays: string;
+    plan_start_date: string | null;
+    plan_end_date: string | null;
+    actual_start_date: string | null;
+    actual_end_date: string | null;
     customers: CustomerProjectOption[];
     pm: UserOption | null;
     incentive_profile: IncentiveProfileOption | null;
     tasks_count: number;
+    done_tasks_count: number;
     members_count: number;
     actions: ProjectActions;
+};
+
+export type ProjectKanbanColumn = {
+    status: ProjectStatus;
+    label: string;
+    projects: ProjectSummary[];
 };
 
 export type ProjectDetail = ProjectSummary & {
@@ -105,7 +116,7 @@ export type ProjectDetail = ProjectSummary & {
 };
 
 export type ProjectIndexProps = {
-    projects: Paginated<ProjectSummary>;
+    columns: ProjectKanbanColumn[];
     metrics: Record<ProjectStatus, number>;
     filters: {
         search: string;
@@ -169,6 +180,9 @@ export type PreparationTask = {
     plan_start_date: string;
     plan_end_date: string;
     attachments?: File[];
+    attachments_count?: number;
+    allowed_statuses?: ProjectTaskStatus[];
+    task_type?: { id: number; name: string; color: string } | null;
 };
 
 export type ProjectPreparationProps = {
@@ -206,4 +220,93 @@ export type ProjectApprovalSummary = {
 
 export type ProjectApprovalsProps = {
     projects: Paginated<ProjectApprovalSummary>;
+};
+
+export type TaskKanbanCard = {
+    id: number;
+    name: string;
+    status: ProjectTaskStatus;
+    description: string | null;
+    plan_start_date: string | null;
+    plan_end_date: string | null;
+    actual_start_date: string | null;
+    actual_end_date: string | null;
+    attachments_count: number;
+    project: {
+        id: number;
+        name: string;
+        status: ProjectStatus;
+        customer: string | null;
+    } | null;
+    pic: UserOption | null;
+    task_type: { id: number; name: string; color: string } | null;
+    allowed_statuses: ProjectTaskStatus[];
+};
+
+export type TaskKanbanColumn = {
+    status: ProjectTaskStatus;
+    label: string;
+    tasks: TaskKanbanCard[];
+};
+
+export type TaskBoardProps = {
+    columns: TaskKanbanColumn[];
+    filters: {
+        search: string;
+        project_id: string;
+        pic_user_id: string;
+        task_type_id: string;
+        due: string;
+    };
+    options: {
+        projects: Array<{ id: number; name: string }>;
+        users: UserOption[];
+        task_types: Array<{ id: number; name: string; color: string }>;
+        statuses: Array<{ value: ProjectTaskStatus; label: string }>;
+        due_filters: Array<{ value: string; label: string }>;
+    };
+};
+
+export type ProjectPreparationIndexProps = {
+    columns: ProjectKanbanColumn[];
+    filters: {
+        search: string;
+        status: string;
+    };
+    options: {
+        statuses: Array<{ value: ProjectStatus; label: string }>;
+        customers: CustomerProjectOption[];
+        incentive_profiles: IncentiveProfileOption[];
+    };
+};
+
+export type DashboardProjectCard = {
+    id: number;
+    name: string;
+    status: ProjectStatus;
+    customer: string | null;
+    pm: string | null;
+    plan_end_date: string | null;
+};
+
+export type DashboardProps = {
+    metrics: {
+        active_projects: number;
+        awaiting_approval: number;
+        overdue_tasks: number;
+        due_this_week_tasks: number;
+    };
+    project_status_distribution: Array<{
+        status: ProjectStatus;
+        label: string;
+        count: number;
+    }>;
+    task_status_distribution: Array<{
+        status: ProjectTaskStatus;
+        label: string;
+        count: number;
+    }>;
+    recent_rejected_projects: DashboardProjectCard[];
+    ready_to_close_projects: DashboardProjectCard[];
+    scope: 'global' | 'assigned';
 };

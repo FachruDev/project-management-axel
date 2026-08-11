@@ -16,11 +16,13 @@ use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\User;
 use App\Services\Projects\ProjectLifecycleService;
+use App\Services\Projects\ProjectVisibilityService;
 use App\Services\Projects\ProjectWriteService;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -30,6 +32,7 @@ class ProjectController extends Controller
     public function __construct(
         private readonly ProjectWriteService $writeService,
         private readonly ProjectLifecycleService $lifecycleService,
+        private readonly ProjectVisibilityService $visibility,
     ) {}
 
     public function index(Request $request): Response
@@ -39,21 +42,27 @@ class ProjectController extends Controller
         $customerId = $request->string('customer_id')->trim()->toString();
         $pmUserId = $request->string('pm_user_id')->trim()->toString();
 
-        $projects = Project::query()
+        $actor = $this->actor($request);
+        $projects = $this->visibility->visibleProjects(Project::query(), $actor)
             ->with(['customers', 'pm', 'incentiveProfile'])
-            ->withCount(['tasks', 'members'])
+            ->withCount([
+                'tasks',
+                'members',
+                'tasks as done_tasks_count' => fn ($query) => $query->where('status', TaskStatus::Done->value),
+            ])
+            ->whereIn('status', $this->operationalStatuses())
             ->when($search !== '', fn ($query) => $query->where('name', 'like', "%{$search}%"))
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($customerId !== '', fn ($query) => $query->whereHas('customers', fn ($query) => $query->whereKey($customerId)))
             ->when($pmUserId !== '', fn ($query) => $query->where('pm_user_id', $pmUserId))
-            ->latest()
-            ->paginate(10)
-            ->withQueryString()
-            ->through(fn (Project $project): array => $this->summary($project));
+            ->orderByRaw("case status when 'planning' then 1 when 'ongoing' then 2 when 'awaiting_bast' then 3 when 'ready_to_close' then 4 when 'closed' then 5 else 6 end")
+            ->latest('updated_at')
+            ->get()
+            ->map(fn (Project $project): array => $this->summary($project));
 
         return Inertia::render('projects/index', [
-            'projects' => $projects,
-            'metrics' => $this->statusMetrics(),
+            'columns' => $this->projectColumns($projects),
+            'metrics' => $this->statusMetrics($actor),
             'filters' => [
                 'search' => $search,
                 'status' => $status,
@@ -67,6 +76,12 @@ class ProjectController extends Controller
     public function store(StoreProjectRequest $request): RedirectResponse
     {
         $project = $this->writeService->create($request->validated(), $this->actor($request));
+
+        if ($request->string('redirect_to')->toString() === 'preparation') {
+            return redirect()
+                ->route('projects.preparation.show', $project)
+                ->with('success', 'Project saved.');
+        }
 
         return redirect()
             ->route('projects.show', $project)
@@ -161,6 +176,10 @@ class ProjectController extends Controller
             'project_date' => $this->dateString($project->project_date),
             'status' => $project->currentStatus()->value,
             'mandays' => $project->mandays,
+            'plan_start_date' => $this->dateString($project->plan_start_date),
+            'plan_end_date' => $this->dateString($project->plan_end_date),
+            'actual_start_date' => $this->dateString($project->actual_start_date),
+            'actual_end_date' => $this->dateString($project->actual_end_date),
             'customers' => $project->customers->map(fn (Customer $customer): array => $this->customerPayload($customer))->values()->all(),
             'pm' => $project->pm ? $this->userOption($project->pm) : null,
             'incentive_profile' => $project->incentiveProfile ? [
@@ -170,6 +189,7 @@ class ProjectController extends Controller
                 'version' => $project->incentiveProfile->version,
             ] : null,
             'tasks_count' => $project->tasks_count ?? 0,
+            'done_tasks_count' => $project->done_tasks_count ?? 0,
             'members_count' => $project->members_count ?? 0,
             'actions' => $this->actions($project),
         ];
@@ -239,14 +259,15 @@ class ProjectController extends Controller
     /**
      * @return array<string, int>
      */
-    private function statusMetrics(): array
+    private function statusMetrics(User $user): array
     {
-        $counts = Project::query()
+        $counts = $this->visibility->visibleProjects(Project::query(), $user)
             ->select('status', DB::raw('count(*) as aggregate'))
+            ->whereIn('status', $this->operationalStatuses())
             ->groupBy('status')
             ->pluck('aggregate', 'status');
 
-        return collect(ProjectStatus::cases())
+        return collect($this->operationalStatuses())
             ->mapWithKeys(fn (ProjectStatus $status): array => [
                 $status->value => (int) ($counts[$status->value] ?? 0),
             ])
@@ -259,7 +280,7 @@ class ProjectController extends Controller
     private function options(): array
     {
         return [
-            'statuses' => collect(ProjectStatus::cases())
+            'statuses' => collect($this->operationalStatuses())
                 ->map(fn (ProjectStatus $status): array => [
                     'value' => $status->value,
                     'label' => str($status->value)->replace('_', ' ')->headline()->toString(),
@@ -277,6 +298,38 @@ class ProjectController extends Controller
                 ->where('status', IncentiveProfileStatus::Active->value)
                 ->orderBy('code')
                 ->get(['id', 'code', 'name', 'version']),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $projects
+     * @return array<int, array{status: string, label: string, projects: array<int, array<string, mixed>>}>
+     */
+    private function projectColumns(Collection $projects): array
+    {
+        return collect($this->operationalStatuses())
+            ->map(fn (ProjectStatus $status): array => [
+                'status' => $status->value,
+                'label' => str($status->value)->replace('_', ' ')->headline()->toString(),
+                'projects' => $projects
+                    ->where('status', $status->value)
+                    ->values()
+                    ->all(),
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<int, ProjectStatus>
+     */
+    private function operationalStatuses(): array
+    {
+        return [
+            ProjectStatus::Planning,
+            ProjectStatus::Ongoing,
+            ProjectStatus::AwaitingBast,
+            ProjectStatus::ReadyToClose,
+            ProjectStatus::Closed,
         ];
     }
 

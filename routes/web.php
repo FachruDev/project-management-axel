@@ -1,17 +1,21 @@
 <?php
 
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\IncentiveProfileController;
 use App\Http\Controllers\ProjectApprovalController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectPreparationController;
+use App\Http\Controllers\ProjectPreparationIndexController;
+use App\Http\Controllers\ProjectTaskStatusController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\TaskBoardController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('portal.auth')->group(function (): void {
-    Route::inertia('/', 'welcome')->name('home');
+    Route::get('/', DashboardController::class)->name('home');
 
     Route::get('project-approvals', [ProjectApprovalController::class, 'index'])
         ->middleware('can:approve_projects')
@@ -47,6 +51,17 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::resource('projects', ProjectController::class)
         ->only(['index', 'store', 'show', 'update'])
         ->middleware('can:view_projects');
+
+    Route::get('project-preparations', ProjectPreparationIndexController::class)
+        ->middleware('can:manage_projects')
+        ->name('project-preparations.index');
+
+    Route::get('tasks', TaskBoardController::class)
+        ->middleware('can:view_tasks')
+        ->name('tasks.index');
+    Route::patch('tasks/{task}/status', ProjectTaskStatusController::class)
+        ->middleware('can:manage_tasks')
+        ->name('tasks.status.update');
 
     Route::post('incentive-profiles/{incentive_profile}/calculations', [IncentiveProfileController::class, 'calculateProjects'])
         ->middleware('can:calculate_project_incentives')

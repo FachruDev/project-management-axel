@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\TaskType;
 use App\Models\User;
+use App\Services\Projects\ProjectTaskTransitionService;
 use App\Services\Projects\ProjectWriteService;
 use DateTimeInterface;
 use Illuminate\Http\RedirectResponse;
@@ -23,6 +24,7 @@ class ProjectPreparationController extends Controller
 {
     public function __construct(
         private readonly ProjectWriteService $writeService,
+        private readonly ProjectTaskTransitionService $transitionService,
     ) {}
 
     public function show(Project $project): Response
@@ -36,6 +38,7 @@ class ProjectPreparationController extends Controller
             'accessRules.user',
             'tasks.taskType',
             'tasks.member.user',
+            'tasks.attachments',
             'attachments',
         ]);
 
@@ -98,6 +101,15 @@ class ProjectPreparationController extends Controller
                 'description' => $task->description,
                 'plan_start_date' => $this->dateString($task->plan_start_date),
                 'plan_end_date' => $this->dateString($task->plan_end_date),
+                'attachments_count' => $task->attachments->count(),
+                'task_type' => $task->taskType ? [
+                    'id' => $task->taskType->id,
+                    'name' => $task->taskType->name,
+                    'color' => $task->taskType->color,
+                ] : null,
+                'allowed_statuses' => collect($this->transitionService->allowedTargets($task))
+                    ->map(fn (TaskStatus $status): string => $status->value)
+                    ->all(),
             ])->values()->all(),
             'attachments' => $this->attachmentPayload($project),
         ];
