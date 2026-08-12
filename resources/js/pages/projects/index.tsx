@@ -1,7 +1,19 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEcho } from '@laravel/echo-react';
+import {
+    Search,
+    Pencil,
+    CheckSquare,
+    Trash2,
+    ExternalLink,
+    MapPin,
+    Calendar,
+    Filter,
+    Plus
+} from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+
 import bulkDeleteProjects from '@/actions/App/Http/Controllers/ProjectBulkDeleteController';
 import {
     destroy,
@@ -29,17 +41,17 @@ import type {
 } from '@/types';
 
 const inputClass =
-    'rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-primary';
+    'h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-800 transition-all outline-none focus:border-primary focus:ring-1 focus:ring-primary';
 
 const laneTone: Record<ProjectStatus, string> = {
-    draft: 'border-slate-200 bg-pastel-slate text-slate-700',
-    pending_approval: 'border-amber-200 bg-pastel-amber text-amber-800',
-    rejected: 'border-red-200 bg-pastel-red text-red-700',
-    planning: 'border-blue-200 bg-pastel-blue text-primary',
-    ongoing: 'border-emerald-200 bg-pastel-green text-emerald-700',
-    awaiting_bast: 'border-purple-200 bg-pastel-purple text-purple-700',
-    ready_to_close: 'border-amber-200 bg-pastel-amber text-amber-800',
-    closed: 'border-slate-300 bg-white text-slate-700',
+    draft: 'border-slate-200 bg-slate-100/70 text-slate-700',
+    pending_approval: 'border-amber-200 bg-amber-50/60 text-amber-800',
+    rejected: 'border-red-200 bg-red-50/60 text-red-700',
+    planning: 'border-sky-200 bg-sky-50/60 text-sky-800',
+    ongoing: 'border-emerald-200 bg-emerald-50/60 text-emerald-800',
+    awaiting_bast: 'border-purple-200 bg-purple-50/60 text-purple-800',
+    ready_to_close: 'border-amber-200 bg-amber-50/60 text-amber-800',
+    closed: 'border-slate-200 bg-slate-50 text-slate-600',
 };
 
 type PendingMove = {
@@ -48,7 +60,22 @@ type PendingMove = {
 };
 
 type BoardChangedEvent = {
+    action?: string;
     actor_id?: number | null;
+    project_id?: number | null;
+    old_status?: ProjectStatus | null;
+    new_status?: ProjectStatus | null;
+};
+
+const projectStatusRank: Record<ProjectStatus, number> = {
+    draft: 0,
+    pending_approval: 0,
+    rejected: 0,
+    planning: 1,
+    ongoing: 2,
+    awaiting_bast: 3,
+    ready_to_close: 4,
+    closed: 5,
 };
 
 export default function ProjectIndex({
@@ -62,49 +89,34 @@ export default function ProjectIndex({
     const [customerId, setCustomerId] = useState(filters.customer_id);
     const [pmUserId, setPmUserId] = useState(filters.pm_user_id);
     const [boardColumns, setBoardColumns] = useState(columns);
+    const [boardMetrics, setBoardMetrics] = useState(metrics);
     const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
     const [moveReason, setMoveReason] = useState('');
     const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
+
     const flash = usePage().props.flash as { success?: string | null } | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
     const { auth } = usePage().props as unknown as { auth: Auth };
     const canManageProjects =
         auth.user?.permissions.includes('manage_projects') ?? false;
 
-    useEffect(() => {
-        setBoardColumns(columns);
-    }, [columns]);
-
     useEcho(
         'project-board',
         ['.project.board.changed'],
         (event: BoardChangedEvent) => {
-            if (event.actor_id === auth.user?.id) {
-                return;
-            }
-
-            router.reload({
-                only: ['columns', 'metrics'],
-            });
+            if (event.actor_id === auth.user?.id) return;
+            
+            applyProjectBoardEvent(event);
         },
-        [auth.user?.id],
+        [auth.user?.id, status],
     );
 
     function submitFilters(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-
         router.get(
             index.url(),
-            {
-                search,
-                status,
-                customer_id: customerId,
-                pm_user_id: pmUserId,
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-            },
+            { search, status, customer_id: customerId, pm_user_id: pmUserId },
+            { preserveScroll: true, preserveState: true }
         );
     }
 
@@ -114,42 +126,82 @@ export default function ProjectIndex({
             .find((item) => String(item.id) === projectId);
         const targetStatus = laneStatus as ProjectStatus;
 
-        if (! project || project.status === targetStatus) {
-            return;
-        }
+        if (!project || project.status === targetStatus) return;
 
-        setPendingMove({ project, targetStatus });
-        setMoveReason('');
+        requestMove(project, targetStatus);
     }
 
-    function submitMove(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
+    function requestMove(project: ProjectSummary, targetStatus: ProjectStatus) {
+        if (isBackwardProjectStatus(project.status, targetStatus)) {
+            setPendingMove({ project, targetStatus });
+            setMoveReason('');
 
-        if (! pendingMove) {
             return;
         }
+        performMove(project, targetStatus);
+    }
 
+    function submitRollbackMove(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+
+        if (!pendingMove) return;
+
+        performMove(pendingMove.project, pendingMove.targetStatus, moveReason);
+    }
+
+    function performMove(
+        project: ProjectSummary,
+        targetStatus: ProjectStatus,
+        reason = '',
+    ) {
         const previousColumns = boardColumns;
-        const { project, targetStatus } = pendingMove;
+        const previousMetrics = boardMetrics;
 
         router.patch(
             statusMove.url(project.id),
-            {
-                target_status: targetStatus,
-                reason: moveReason,
-            },
+            { target_status: targetStatus, reason },
             {
                 preserveScroll: true,
                 preserveState: true,
-                only: ['columns', 'metrics', 'flash'],
+                only: ['flash'],
                 onBefore: () => {
                     setBoardColumns(moveProject(previousColumns, project.id, targetStatus));
+                    setBoardMetrics(updateProjectMetrics(previousMetrics, project.status, targetStatus));
                 },
                 onError: () => {
                     setBoardColumns(previousColumns);
+                    setBoardMetrics(previousMetrics);
                 },
                 onSuccess: () => setPendingMove(null),
             },
+        );
+    }
+
+    function applyProjectBoardEvent(event: BoardChangedEvent) {
+        if (!event.project_id) return;
+
+        if (event.action === 'project_deleted') {
+            setBoardColumns((current) => removeProject(current, event.project_id as number));
+            setBoardMetrics((current) =>
+                event.old_status ? updateProjectMetrics(current, event.old_status, null) : current,
+            );
+
+            return;
+        }
+
+        if (!event.new_status) return;
+
+        setBoardColumns((current) =>
+            moveProjectForCurrentFilter(
+                current,
+                event.project_id as number,
+                event.new_status as ProjectStatus,
+                status,
+            ),
+        );
+
+        setBoardMetrics((current) =>
+            updateProjectMetrics(current, event.old_status ?? null, event.new_status ?? null),
         );
     }
 
@@ -162,21 +214,15 @@ export default function ProjectIndex({
     }
 
     function deleteProject(project: ProjectSummary) {
-        if (! window.confirm(`Delete project "${project.name}"?`)) {
-            return;
-        }
+        if (!window.confirm(`Delete project "${project.name}"?`)) return;
 
         router.delete(destroy.url(project.id), { preserveScroll: true });
     }
 
     function bulkDeleteSelectedProjects() {
-        if (selectedProjectIds.length === 0) {
-            return;
-        }
+        if (selectedProjectIds.length === 0) return;
 
-        if (! window.confirm(`Delete ${selectedProjectIds.length} selected project(s)?`)) {
-            return;
-        }
+        if (!window.confirm(`Delete ${selectedProjectIds.length} selected project(s)?`)) return;
 
         router.delete(bulkDeleteProjects.url(), {
             data: { project_ids: selectedProjectIds },
@@ -187,216 +233,154 @@ export default function ProjectIndex({
 
     return (
         <AppLayout title="Projects">
-            <PageHeader
-                eyebrow="Operational Kanban"
-                title="Projects"
-                description="Planning hingga closed. Draft, pending approval, dan rejected dikelola di Project Preparation."
-                actions={
-                    <Link
-                        href={preparationIndex.url()}
-                        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
-                    >
-                        Project Preparation
-                    </Link>
-                }
-            />
+            <div className="space-y-6">
 
-            {flash?.success && <Alert tone="success">{flash.success}</Alert>}
-            {errors?.project && <Alert tone="danger">{errors.project}</Alert>}
-            {errors?.target_status && (
-                <Alert tone="danger">{errors.target_status}</Alert>
-            )}
-            {errors?.reason && <Alert tone="danger">{errors.reason}</Alert>}
-
-            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                {boardColumns.map((column) => (
-                    <div
-                        key={column.status}
-                        className={`rounded-lg border p-4 ${laneTone[column.status]}`}
-                    >
-                        <div className="text-xs font-semibold uppercase">
-                            {column.label}
-                        </div>
-                        <div className="mt-3 text-2xl font-semibold">
-                            {metrics[column.status] ?? 0}
-                        </div>
-                    </div>
-                ))}
-            </section>
-
-            <form
-                onSubmit={submitFilters}
-                className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 lg:grid-cols-[1fr_180px_220px_220px_auto]"
-            >
-                <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search operational project"
-                    className={inputClass}
+                {/* Header */}
+                <PageHeader
+                    eyebrow="Operational Board"
+                    title="Projects Kanban"
+                    description="Kelola siklus project dari planning hingga closed bergaya Jira Board."
+                    actions={
+                        <Link
+                            href={preparationIndex.url()}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition-all active:scale-95"
+                        >
+                            <Plus className="h-4 w-4" />
+                            <span>Project Preparation</span>
+                        </Link>
+                    }
                 />
-                <select
-                    value={status}
-                    onChange={(event) => setStatus(event.target.value)}
-                    className={inputClass}
-                >
-                    <option value="">All Status</option>
-                    {options.statuses.map((item) => (
-                        <option key={item.value} value={item.value}>
-                            {item.label}
-                        </option>
-                    ))}
-                </select>
-                <select
-                    value={customerId}
-                    onChange={(event) => setCustomerId(event.target.value)}
-                    className={inputClass}
-                >
-                    <option value="">All Customers</option>
-                    {options.customers.map((customer) => (
-                        <option key={customer.id} value={customer.id}>
-                            {customer.name}
-                        </option>
-                    ))}
-                </select>
-                <select
-                    value={pmUserId}
-                    onChange={(event) => setPmUserId(event.target.value)}
-                    className={inputClass}
-                >
-                    <option value="">All PM</option>
-                    {options.users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                            {user.name}
-                        </option>
-                    ))}
-                </select>
-                <button
-                    type="submit"
-                    className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-pastel-blue"
-                >
-                    Apply
-                </button>
-            </form>
 
-            {canManageProjects && (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3">
-                    <div className="text-sm text-slate-600">
-                        {selectedProjectIds.length} project selected
-                    </div>
-                    <button
-                        type="button"
-                        disabled={selectedProjectIds.length === 0}
-                        onClick={bulkDeleteSelectedProjects}
-                        className="rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-pastel-red disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        Bulk Delete
-                    </button>
-                </div>
-            )}
+                {/* Alerts */}
+                {flash?.success && <Alert tone="success">{flash.success}</Alert>}
+                {errors?.project && <Alert tone="danger">{errors.project}</Alert>}
+                {errors?.target_status && <Alert tone="danger">{errors.target_status}</Alert>}
+                {errors?.reason && <Alert tone="danger">{errors.reason}</Alert>}
 
-            <KanbanBoard onDropItem={handleDrop}>
-                {boardColumns.map((column) => (
-                    <KanbanLane
-                        key={column.status}
-                        id={column.status}
-                        title={column.label}
-                        count={column.projects.length}
-                        tone={laneTone[column.status]}
-                    >
-                        {column.projects.map((project) => (
-                            <ProjectCard
-                                key={project.id}
-                                project={project}
-                                selected={selectedProjectIds.includes(project.id)}
-                                canManageProjects={canManageProjects}
-                                onToggleSelected={toggleProjectSelection}
-                                onDelete={deleteProject}
-                            />
-                        ))}
-                        {column.projects.length === 0 && (
-                            <EmptyLane>No project in this lane.</EmptyLane>
-                        )}
-                    </KanbanLane>
-                ))}
-            </KanbanBoard>
-
-            <Modal
-                open={pendingMove !== null}
-                title="Status Move Notes"
-                onClose={() => setPendingMove(null)}
-            >
-                <form onSubmit={submitMove} className="space-y-4">
-                    <p className="text-sm text-slate-600">
-                        Project akan dipindahkan dari{' '}
-                        <strong>{pendingMove?.project.status}</strong> ke{' '}
-                        <strong>{pendingMove?.targetStatus}</strong>. Notes bersifat
-                        opsional dan akan masuk audit log.
-                    </p>
-                    <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-                        <span>Notes / Reason</span>
-                        <textarea
-                            value={moveReason}
-                            onChange={(event) =>
-                                setMoveReason(event.target.value)
-                            }
-                            className={`${inputClass} min-h-28`}
+                {/* Filter Toolbar Jira Style */}
+                <form
+                    onSubmit={submitFilters}
+                    className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs"
+                >
+                    <div className="relative flex-1 min-w-[200px]">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                        <input
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Search project..."
+                            className={`${inputClass} w-full pl-8`}
                         />
-                    </label>
-                    <div className="flex justify-end gap-2">
+                    </div>
+                    <select value={status} onChange={(event) => setStatus(event.target.value)} className={inputClass}>
+                        <option value="">All Statuses</option>
+                        {options.statuses.map((item) => (
+                            <option key={item.value} value={item.value}>{item.label}</option>
+                        ))}
+                    </select>
+                    <select value={customerId} onChange={(event) => setCustomerId(event.target.value)} className={inputClass}>
+                        <option value="">All Customers</option>
+                        {options.customers.map((customer) => (
+                            <option key={customer.id} value={customer.id}>{customer.name}</option>
+                        ))}
+                    </select>
+                    <select value={pmUserId} onChange={(event) => setPmUserId(event.target.value)} className={inputClass}>
+                        <option value="">All PMs</option>
+                        {options.users.map((user) => (
+                            <option key={user.id} value={user.id}>{user.name}</option>
+                        ))}
+                    </select>
+                    <button
+                        type="submit"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200"
+                    >
+                        <Filter className="h-3.5 w-3.5" />
+                        <span>Filter</span>
+                    </button>
+                </form>
+
+                {/* Bulk Actions Indicator */}
+                {canManageProjects && selectedProjectIds.length > 0 && (
+                    <div className="flex items-center justify-between rounded-lg border border-indigo-200 bg-indigo-50/80 px-4 py-2 text-xs font-semibold text-indigo-900 shadow-xs">
+                        <span>{selectedProjectIds.length} project(s) selected</span>
                         <button
                             type="button"
-                            onClick={() => setPendingMove(null)}
-                            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
+                            onClick={bulkDeleteSelectedProjects}
+                            className="inline-flex items-center gap-1 rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white transition-all hover:bg-red-700"
                         >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
-                        >
-                            Move Status
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Bulk Delete</span>
                         </button>
                     </div>
-                </form>
-            </Modal>
+                )}
+
+                {/* Kanban Board Container */}
+                <KanbanBoard onDropItem={handleDrop}>
+                    {boardColumns.map((column) => (
+                        <KanbanLane
+                            key={column.status}
+                            id={column.status}
+                            title={column.label}
+                            count={column.projects.length}
+                            tone={laneTone[column.status]}
+                        >
+                            {column.projects.map((project) => (
+                                <ProjectCard
+                                    key={project.id}
+                                    project={project}
+                                    selected={selectedProjectIds.includes(project.id)}
+                                    canManageProjects={canManageProjects}
+                                    onToggleSelected={toggleProjectSelection}
+                                    onDelete={deleteProject}
+                                />
+                            ))}
+                            {column.projects.length === 0 && (
+                                <EmptyLane>No issues in this lane</EmptyLane>
+                            )}
+                        </KanbanLane>
+                    ))}
+                </KanbanBoard>
+
+                {/* Rollback Modal */}
+                <Modal open={pendingMove !== null} title="Rollback Project Status" onClose={() => setPendingMove(null)}>
+                    <form onSubmit={submitRollbackMove} className="space-y-4 pt-2">
+                        <p className="text-xs leading-relaxed text-slate-600">
+                            Project akan dipindahkan mundur dari status{' '}
+                            <span className="font-bold text-slate-900">{pendingMove?.project.status}</span> ke{' '}
+                            <span className="font-bold text-slate-900">{pendingMove?.targetStatus}</span>.
+                        </p>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-700">Reason / Audit Notes</label>
+                            <textarea
+                                value={moveReason}
+                                onChange={(event) => setMoveReason(event.target.value)}
+                                placeholder="Berikan alasan perubahan status..."
+                                className={`${inputClass} min-h-[90px] w-full p-2.5`}
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setPendingMove(null)}
+                                className="rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-white hover:bg-primary/90"
+                            >
+                                Confirm Move
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
+
+            </div>
         </AppLayout>
     );
 }
 
-function moveProject(
-    columns: ProjectIndexProps['columns'],
-    projectId: number,
-    targetStatus: ProjectStatus,
-) {
-    let movedProject: ProjectSummary | null = null;
-
-    const nextColumns = columns.map((column) => {
-        const projects = column.projects.filter((project) => {
-            if (project.id !== projectId) {
-                return true;
-            }
-
-            movedProject = { ...project, status: targetStatus };
-
-            return false;
-        });
-
-        return { ...column, projects };
-    });
-
-    if (! movedProject) {
-        return columns;
-    }
-
-    const moved = movedProject;
-
-    return nextColumns.map((column) =>
-        column.status === targetStatus
-            ? { ...column, projects: [moved, ...column.projects] }
-            : column,
-    );
-}
-
+{/* Komponen Project Card Internal */}
 function ProjectCard({
     project,
     selected,
@@ -412,103 +396,173 @@ function ProjectCard({
 }) {
     return (
         <DraggableKanbanCard id={String(project.id)} selected={selected}>
-            <div className="space-y-4 pr-8">
-                <div className="flex items-start gap-3">
+            {/* onPointerDown={(e) => e.stopPropagation()} SANGAT PENTING untuk mencegah event klik tembus memicu fungsi drag dnd-kit */}
+
+            <div className="mt-1 flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
                     {canManageProjects && (
                         <input
                             type="checkbox"
                             checked={selected}
+                            onPointerDown={(e) => e.stopPropagation()}
                             onChange={() => onToggleSelected(project.id)}
-                            className="mt-1"
+                            className="h-3.5 w-3.5 cursor-pointer rounded-sm border-slate-300 text-primary focus:ring-primary/20"
                             aria-label={`Select ${project.name}`}
                         />
                     )}
-                    <div className="min-w-0 flex-1">
-                        <ProjectStatusBadge status={project.status} />
-                        <Link
-                            href={show.url(project.id)}
-                            className="mt-2 block text-sm font-semibold leading-5 text-slate-950 hover:text-primary"
-                        >
-                            {project.name}
-                        </Link>
-                    </div>
+                    <ProjectStatusBadge status={project.status} />
                 </div>
 
-                <div className="grid gap-2 text-xs text-slate-600">
-                    <CompactRow label="PIC PM" value={project.pm?.name ?? '-'} />
-                    <CompactRow label="Tasks" value={`${project.tasks_count} task`} />
-                    <CompactRow label="Location" value={project.location ?? '-'} />
-                    <CompactRow
-                        label="Deadline"
-                        value={project.plan_end_date ?? '-'}
-                    />
-                </div>
-
-                <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                {/* Action Buttons (Icon Only) */}
+                <div
+                    className="flex items-center gap-1 opacity-80 transition-opacity group-hover:opacity-100"
+                    onPointerDown={(e) => e.stopPropagation()}
+                >
                     <Link
-                        href={preparationShow.url(project.id)}
-                        className="rounded-md border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-pastel-blue"
+                        href={show.url(project.id)}
+                        title="View Detail"
+                        className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                     >
-                        Edit Project
+                        <ExternalLink className="h-3.5 w-3.5" />
                     </Link>
                     <Link
-                        href={taskBoardIndex.url({
-                            query: { project_id: project.id },
-                        })}
-                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                        href={preparationShow.url(project.id)}
+                        title="Edit Project"
+                        className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-primary"
                     >
-                        Tasks
+                        <Pencil className="h-3.5 w-3.5" />
+                    </Link>
+                    <Link
+                        href={taskBoardIndex.url({ query: { project_id: project.id } })}
+                        title="Task Board"
+                        className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-indigo-600"
+                    >
+                        <CheckSquare className="h-3.5 w-3.5" />
                     </Link>
                     {canManageProjects && (
                         <button
                             type="button"
+                            title="Delete Project"
                             onClick={() => onDelete(project)}
-                            className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-pastel-red"
+                            className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
                         >
-                            Delete
+                            <Trash2 className="h-3.5 w-3.5" />
                         </button>
                     )}
+                </div>
+            </div>
+
+            {/* Project Title */}
+            <Link
+                href={show.url(project.id)}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="mt-2.5 block text-xs font-bold text-slate-900 line-clamp-2 transition-colors hover:text-primary"
+            >
+                {project.name}
+            </Link>
+
+            {/* Project Metadata */}
+            <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-2.5 text-[11px] text-slate-500">
+                <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1 text-slate-400">
+                        <MapPin className="h-3 w-3" />
+                        <span className="max-w-[100px] truncate">{project.location ?? '-'}</span>
+                    </span>
+                    <span className="flex items-center gap-1 font-medium text-slate-600">
+                        <Calendar className="h-3 w-3 text-slate-400" />
+                        {project.plan_end_date ?? '-'}
+                    </span>
+                </div>
+            </div>
+
+            {/* Card Footer Jira Style (PM Avatar & Tasks Count) */}
+            <div className="mt-3 flex items-center justify-between border-t border-slate-50 pt-2">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100/80 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                    <CheckSquare className="h-3 w-3 text-slate-400" />
+                    <span>{project.tasks_count} tasks</span>
+                </div>
+
+                {/* PM Avatar */}
+                <div
+                    title={`PM: ${project.pm?.name ?? 'Unassigned'}`}
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-700 ring-2 ring-white"
+                >
+                    {project.pm?.name?.charAt(0) ?? '?'}
                 </div>
             </div>
         </DraggableKanbanCard>
     );
 }
 
-function CompactRow({ label, value }: { label: string; value: ReactNode }) {
-    return (
-        <div className="flex justify-between gap-3">
-            <span className="text-slate-500">{label}</span>
-            <span className="max-w-[180px] truncate text-right font-medium text-slate-800">
-                {value}
-            </span>
-        </div>
-    );
-}
-
 function EmptyLane({ children }: { children: ReactNode }) {
     return (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-4 text-center text-sm text-slate-500">
+        <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs font-medium text-slate-400">
             {children}
         </div>
     );
 }
 
-function Alert({
-    tone,
-    children,
-}: {
-    tone: 'success' | 'danger';
-    children: ReactNode;
-}) {
+function Alert({ tone, children }: { tone: 'success' | 'danger'; children: ReactNode }) {
     return (
         <div
-            className={`rounded-lg border px-4 py-3 text-sm ${
-                tone === 'success'
-                    ? 'border-emerald-200 bg-pastel-green text-emerald-800'
-                    : 'border-red-200 bg-pastel-red text-red-700'
+            className={`rounded-lg border px-3.5 py-2.5 text-xs font-medium shadow-xs ${
+                tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'
             }`}
         >
             {children}
         </div>
     );
+}
+
+// Helper functions (moveProject, moveProjectForCurrentFilter, dll.)
+function moveProject(columns: ProjectIndexProps['columns'], projectId: number, targetStatus: ProjectStatus) {
+    let movedProject: ProjectSummary | null = null;
+    const nextColumns = columns.map((column) => {
+        const projects = column.projects.filter((project) => {
+            if (project.id !== projectId) return true;
+
+            movedProject = { ...project, status: targetStatus };
+
+            return false;
+        });
+
+        return { ...column, projects };
+    });
+
+    if (!movedProject) return columns;
+
+    const moved = movedProject;
+
+    return nextColumns.map((column) =>
+        column.status === targetStatus ? { ...column, projects: [moved, ...column.projects] } : column
+    );
+}
+
+function moveProjectForCurrentFilter(columns: ProjectIndexProps['columns'], projectId: number, targetStatus: ProjectStatus, activeStatusFilter: string) {
+    if (activeStatusFilter !== '' && activeStatusFilter !== targetStatus) {
+        return removeProject(columns, projectId);
+    }
+
+    return moveProject(columns, projectId, targetStatus);
+}
+
+function removeProject(columns: ProjectIndexProps['columns'], projectId: number) {
+    return columns.map((column) => ({
+        ...column,
+        projects: column.projects.filter((project) => project.id !== projectId),
+    }));
+}
+
+function updateProjectMetrics(metrics: ProjectIndexProps['metrics'], oldStatus: ProjectStatus | null, newStatus: ProjectStatus | null) {
+    if (oldStatus === newStatus) return metrics;
+
+    return {
+        ...metrics,
+        ...(oldStatus ? { [oldStatus]: Math.max((metrics[oldStatus] ?? 0) - 1, 0) } : {}),
+        ...(newStatus ? { [newStatus]: (metrics[newStatus] ?? 0) + 1 } : {}),
+    };
+}
+
+function isBackwardProjectStatus(currentStatus: ProjectStatus, targetStatus: ProjectStatus) {
+    return projectStatusRank[targetStatus] < projectStatusRank[currentStatus];
 }

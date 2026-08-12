@@ -58,7 +58,7 @@ class ProjectTaskTransitionService
                 $task,
                 ['status' => $currentStatus->value],
                 ['status' => $targetStatus->value],
-                $reason,
+                $this->isBackward($currentStatus, $targetStatus) ? $reason : null,
                 'kanban',
             );
 
@@ -116,5 +116,21 @@ class ProjectTaskTransitionService
         }
 
         return $task->actual_start_date ?? today();
+    }
+
+    private function isBackward(TaskStatus $currentStatus, TaskStatus $targetStatus): bool
+    {
+        return $this->statusRank($targetStatus) < $this->statusRank($currentStatus);
+    }
+
+    private function statusRank(TaskStatus $status): int
+    {
+        return match ($status) {
+            TaskStatus::Todo => 1,
+            TaskStatus::Assigned => 2,
+            TaskStatus::InProgress => 3,
+            TaskStatus::Done => 4,
+            TaskStatus::Cancelled => 5,
+        };
     }
 }

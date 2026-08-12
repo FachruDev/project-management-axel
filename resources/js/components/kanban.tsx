@@ -1,13 +1,12 @@
 import {
     DndContext,
-    type DragEndEvent,
     PointerSensor,
     useDraggable,
     useDroppable,
     useSensor,
     useSensors,
 } from '@dnd-kit/core';
-import { GripVertical } from 'lucide-react';
+import type { DragEndEvent } from '@dnd-kit/core';
 import type { ReactNode } from 'react';
 
 type KanbanBoardProps = {
@@ -42,20 +41,20 @@ export function KanbanBoard({ children, onDropItem }: KanbanBoardProps) {
     );
 
     function handleDragEnd(event: DragEndEvent) {
-        if (! event.over || ! onDropItem) {
+        if (!event.over || !onDropItem) {
             return;
         }
-
+        
         onDropItem(String(event.active.id), String(event.over.id));
     }
 
     const board = (
-        <section className="flex gap-4 overflow-x-auto pb-3">
+        <section className="flex gap-5 overflow-x-auto pb-4 pt-2">
             {children}
         </section>
     );
 
-    if (! onDropItem) {
+    if (!onDropItem) {
         return board;
     }
 
@@ -70,7 +69,7 @@ export function KanbanLane({
     id,
     title,
     count,
-    tone = 'border-slate-200 bg-pastel-slate text-slate-700',
+    tone = 'border-slate-200 bg-slate-100/50 text-slate-700',
     children,
 }: KanbanLaneProps) {
     const { isOver, setNodeRef } = useDroppable({
@@ -80,28 +79,34 @@ export function KanbanLane({
     return (
         <div
             ref={setNodeRef}
-            className={`flex min-h-[560px] w-[340px] shrink-0 flex-col overflow-hidden rounded-lg border bg-slate-50/80 transition ${
+            // Hapus overflow-hidden agar card tidak terpotong saat didrag antar kolom
+            className={`flex min-h-[560px] w-[340px] shrink-0 flex-col rounded-xl border bg-slate-50/60 transition-colors duration-200 ${
                 isOver
-                    ? 'border-primary ring-2 ring-primary/30'
-                    : 'border-slate-200'
+                    ? 'border-primary/60 bg-primary/5 shadow-[0_0_15px_rgba(var(--color-primary),0.1)] ring-1 ring-primary/30'
+                    : 'border-slate-200/80'
             }`}
         >
-            <div className={`border-b px-4 py-3 ${tone}`}>
+            {/* Header Kolom */}
+            <div className={`rounded-t-xl border-b px-4 py-3 ${tone}`}>
                 <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-sm font-semibold">{title}</h2>
-                    <span className="rounded-full bg-white/75 px-2 py-0.5 text-xs font-semibold">
+                    <h2 className="text-xs font-bold uppercase tracking-wider">{title}</h2>
+                    <span className="flex h-5 items-center justify-center rounded-full bg-white/80 px-2 text-[10px] font-bold shadow-xs">
                         {count}
                     </span>
                 </div>
             </div>
-            <div className="flex flex-1 flex-col gap-3 p-3">{children}</div>
+
+            {/* Area Drop Card */}
+            <div className="flex flex-1 flex-col gap-3 p-3">
+                {children}
+            </div>
         </div>
     );
 }
 
 export function KanbanCard({ children }: KanbanCardProps) {
     return (
-        <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-primary/30 hover:shadow-md">
+        <article className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs transition hover:border-slate-300 hover:shadow-md">
             {children}
         </article>
     );
@@ -115,9 +120,13 @@ export function DraggableKanbanCard({
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id,
     });
+
+    // Inject z-index 9999 langsung ke inline style saat isDragging aktif
     const style = transform
         ? {
               transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+              zIndex: isDragging ? 9999 : 1,
+              position: 'relative' as const,
           }
         : undefined;
 
@@ -125,21 +134,20 @@ export function DraggableKanbanCard({
         <article
             ref={setNodeRef}
             style={style}
-            className={`relative rounded-lg border bg-white p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md ${
-                selected ? 'border-primary ring-2 ring-primary/15' : 'border-slate-200'
+            {...listeners}
+            {...attributes}
+            // Seluruh area card menjadi drag handle
+            className={`group relative rounded-xl border bg-white p-3.5 outline-none transition-all duration-200 ${
+                selected ? 'border-primary ring-2 ring-primary/20' : 'border-slate-200/80 hover:border-slate-300'
             } ${
-                isDragging ? 'z-10 opacity-80 shadow-lg' : ''
+                isDragging
+                    ? 'scale-[1.02] cursor-grabbing opacity-90 shadow-2xl ring-2 ring-primary/40'
+                    : 'cursor-grab hover:shadow-md'
             }`}
         >
-            <button
-                type="button"
-                aria-label="Drag card"
-                className="absolute right-2 top-2 flex h-7 w-7 cursor-grab items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-primary active:cursor-grabbing"
-                {...listeners}
-                {...attributes}
-            >
-                <GripVertical className="h-4 w-4" />
-            </button>
+            {/* Jira-style visual grab indicator (Garis kecil di tengah atas) */}
+            <div className="absolute left-1/2 top-1.5 h-1 w-8 -translate-x-1/2 rounded-full bg-slate-200 opacity-0 transition-opacity group-hover:opacity-100"></div>
+
             {children}
         </article>
     );

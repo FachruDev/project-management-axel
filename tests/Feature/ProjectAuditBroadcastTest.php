@@ -68,7 +68,7 @@ class ProjectAuditBroadcastTest extends TestCase
         $this->assertNull($activity->getExtraProperty('reason'));
     }
 
-    public function test_task_status_move_reason_records_audit_and_broadcasts(): void
+    public function test_task_status_move_forward_ignores_reason_and_broadcasts(): void
     {
         $user = $this->userWithPermissions(['manage_tasks']);
         $project = Project::factory()->create(['status' => ProjectStatus::Ongoing]);
@@ -101,7 +101,7 @@ class ProjectAuditBroadcastTest extends TestCase
 
         $this->assertSame(ProjectTask::class, $activity->getExtraProperty('entity_type'));
         $this->assertSame($task->id, $activity->getExtraProperty('entity_id'));
-        $this->assertSame('Starting implementation.', $activity->getExtraProperty('reason'));
+        $this->assertNull($activity->getExtraProperty('reason'));
         $this->assertSame(TaskStatus::Assigned->value, $activity->getExtraProperty('old.status'));
         $this->assertSame(TaskStatus::InProgress->value, $activity->getExtraProperty('new.status'));
     }
