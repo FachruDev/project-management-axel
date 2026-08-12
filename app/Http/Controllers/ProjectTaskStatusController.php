@@ -24,7 +24,12 @@ class ProjectTaskStatusController extends Controller
         abort_unless($user instanceof User, 401);
         abort_unless($this->visibility->canAccessTask($task, $user), 403);
 
-        $this->transitionService->updateStatus($task, TaskStatus::from((string) $request->validated('status')));
+        $this->transitionService->updateStatus(
+            $task,
+            TaskStatus::from((string) $request->validated('status')),
+            $user,
+            $request->validated('reason'),
+        );
 
         return back()->with('success', 'Task status updated.');
     }

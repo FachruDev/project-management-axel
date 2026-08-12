@@ -186,6 +186,63 @@ export default function ProjectShow({ project }: Props) {
                             </table>
                         </div>
                     </Panel>
+
+                    <Panel title="Audit Log">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200 text-sm">
+                                <thead className="text-left text-xs font-semibold uppercase text-slate-500">
+                                    <tr>
+                                        <th className="px-3 py-2">Date</th>
+                                        <th className="px-3 py-2">Actor</th>
+                                        <th className="px-3 py-2">Action</th>
+                                        <th className="px-3 py-2">Entity</th>
+                                        <th className="px-3 py-2">Changes</th>
+                                        <th className="px-3 py-2">Reason</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {project.audit_logs.map((log) => (
+                                        <tr key={log.id} className="align-top">
+                                            <td className="whitespace-nowrap px-3 py-3 text-slate-600">
+                                                {formatDateTime(log.changed_at)}
+                                            </td>
+                                            <td className="px-3 py-3 text-slate-700">
+                                                {log.actor?.name ?? 'System'}
+                                            </td>
+                                            <td className="px-3 py-3">
+                                                <div className="font-medium text-slate-900">
+                                                    {log.action.replaceAll('_', ' ')}
+                                                </div>
+                                                <div className="mt-1 text-xs text-slate-500">
+                                                    {log.source ?? 'manual'}
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-3 text-slate-600">
+                                                {log.entity_type ?? '-'}
+                                                {log.entity_id ? ` #${log.entity_id}` : ''}
+                                            </td>
+                                            <td className="max-w-[320px] px-3 py-3 text-xs text-slate-600">
+                                                <ChangeSummary oldData={log.old} newData={log.new} />
+                                            </td>
+                                            <td className="max-w-[220px] px-3 py-3 text-slate-600">
+                                                {log.reason ?? '-'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {project.audit_logs.length === 0 && (
+                                        <tr>
+                                            <td
+                                                colSpan={6}
+                                                className="px-3 py-10 text-center text-slate-500"
+                                            >
+                                                No audit log yet.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Panel>
                 </div>
 
                 <aside className="space-y-4">
@@ -302,6 +359,55 @@ function ActionButton({
             {children}
         </button>
     );
+}
+
+function ChangeSummary({
+    oldData,
+    newData,
+}: {
+    oldData: Record<string, unknown> | null;
+    newData: Record<string, unknown> | null;
+}) {
+    const keys = Array.from(
+        new Set([...Object.keys(oldData ?? {}), ...Object.keys(newData ?? {})]),
+    ).slice(0, 6);
+
+    if (keys.length === 0) {
+        return <span>-</span>;
+    }
+
+    return (
+        <div className="space-y-1">
+            {keys.map((key) => (
+                <div key={key} className="grid grid-cols-[92px_1fr] gap-2">
+                    <span className="font-medium text-slate-500">{key}</span>
+                    <span className="break-words text-slate-700">
+                        {stringValue(oldData?.[key])} {'->'} {stringValue(newData?.[key])}
+                    </span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function stringValue(value: unknown) {
+    if (value === null || value === undefined || value === '') {
+        return '-';
+    }
+
+    if (typeof value === 'object') {
+        return JSON.stringify(value);
+    }
+
+    return String(value);
+}
+
+function formatDateTime(value: string | null) {
+    if (! value) {
+        return '-';
+    }
+
+    return value.replace('T', ' ').replace(/\.\d+Z$/, '');
 }
 
 function Alert({

@@ -1,6 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
+import { useEcho } from '@laravel/echo-react';
 import type { FormEvent, ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import bulkDeleteProjects from '@/actions/App/Http/Controllers/ProjectBulkDeleteController';
 import {
     destroy,
@@ -41,17 +42,13 @@ const laneTone: Record<ProjectStatus, string> = {
     closed: 'border-slate-300 bg-white text-slate-700',
 };
 
-const statusRank: Partial<Record<ProjectStatus, number>> = {
-    planning: 1,
-    ongoing: 2,
-    awaiting_bast: 3,
-    ready_to_close: 4,
-    closed: 5,
-};
-
-type BackwardMove = {
+type PendingMove = {
     project: ProjectSummary;
     targetStatus: ProjectStatus;
+};
+
+type BoardChangedEvent = {
+    actor_id?: number | null;
 };
 
 export default function ProjectIndex({
@@ -64,14 +61,34 @@ export default function ProjectIndex({
     const [status, setStatus] = useState(filters.status);
     const [customerId, setCustomerId] = useState(filters.customer_id);
     const [pmUserId, setPmUserId] = useState(filters.pm_user_id);
-    const [backwardMove, setBackwardMove] = useState<BackwardMove | null>(null);
-    const [backwardReason, setBackwardReason] = useState('');
+    const [boardColumns, setBoardColumns] = useState(columns);
+    const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+    const [moveReason, setMoveReason] = useState('');
     const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
     const flash = usePage().props.flash as { success?: string | null } | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
     const { auth } = usePage().props as unknown as { auth: Auth };
     const canManageProjects =
         auth.user?.permissions.includes('manage_projects') ?? false;
+
+    useEffect(() => {
+        setBoardColumns(columns);
+    }, [columns]);
+
+    useEcho(
+        'project-board',
+        ['.project.board.changed'],
+        (event: BoardChangedEvent) => {
+            if (event.actor_id === auth.user?.id) {
+                return;
+            }
+
+            router.reload({
+                only: ['columns', 'metrics'],
+            });
+        },
+        [auth.user?.id],
+    );
 
     function submitFilters(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -92,7 +109,7 @@ export default function ProjectIndex({
     }
 
     function handleDrop(projectId: string, laneStatus: string) {
-        const project = columns
+        const project = boardColumns
             .flatMap((column) => column.projects)
             .find((item) => String(item.id) === projectId);
         const targetStatus = laneStatus as ProjectStatus;
@@ -101,39 +118,37 @@ export default function ProjectIndex({
             return;
         }
 
-        const currentRank = statusRank[project.status] ?? 0;
-        const targetRank = statusRank[targetStatus] ?? 0;
+        setPendingMove({ project, targetStatus });
+        setMoveReason('');
+    }
 
-        if (targetRank < currentRank) {
-            setBackwardMove({ project, targetStatus });
-            setBackwardReason('');
+    function submitMove(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
 
+        if (! pendingMove) {
             return;
         }
+
+        const previousColumns = boardColumns;
+        const { project, targetStatus } = pendingMove;
 
         router.patch(
             statusMove.url(project.id),
-            { target_status: targetStatus },
-            { preserveScroll: true },
-        );
-    }
-
-    function submitBackwardMove(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-
-        if (! backwardMove) {
-            return;
-        }
-
-        router.patch(
-            statusMove.url(backwardMove.project.id),
             {
-                target_status: backwardMove.targetStatus,
-                reason: backwardReason,
+                target_status: targetStatus,
+                reason: moveReason,
             },
             {
                 preserveScroll: true,
-                onSuccess: () => setBackwardMove(null),
+                preserveState: true,
+                only: ['columns', 'metrics', 'flash'],
+                onBefore: () => {
+                    setBoardColumns(moveProject(previousColumns, project.id, targetStatus));
+                },
+                onError: () => {
+                    setBoardColumns(previousColumns);
+                },
+                onSuccess: () => setPendingMove(null),
             },
         );
     }
@@ -194,7 +209,7 @@ export default function ProjectIndex({
             {errors?.reason && <Alert tone="danger">{errors.reason}</Alert>}
 
             <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                {columns.map((column) => (
+                {boardColumns.map((column) => (
                     <div
                         key={column.status}
                         className={`rounded-lg border p-4 ${laneTone[column.status]}`}
@@ -280,7 +295,7 @@ export default function ProjectIndex({
             )}
 
             <KanbanBoard onDropItem={handleDrop}>
-                {columns.map((column) => (
+                {boardColumns.map((column) => (
                     <KanbanLane
                         key={column.status}
                         id={column.status}
@@ -306,34 +321,31 @@ export default function ProjectIndex({
             </KanbanBoard>
 
             <Modal
-                open={backwardMove !== null}
-                title="Status Move Reason"
-                onClose={() => setBackwardMove(null)}
+                open={pendingMove !== null}
+                title="Status Move Notes"
+                onClose={() => setPendingMove(null)}
             >
-                <form onSubmit={submitBackwardMove} className="space-y-4">
+                <form onSubmit={submitMove} className="space-y-4">
                     <p className="text-sm text-slate-600">
-                        Project akan dipindahkan mundur dari{' '}
-                        <strong>{backwardMove?.project.status}</strong> ke{' '}
-                        <strong>{backwardMove?.targetStatus}</strong>. Isi alasan
-                        perubahan status ini.
+                        Project akan dipindahkan dari{' '}
+                        <strong>{pendingMove?.project.status}</strong> ke{' '}
+                        <strong>{pendingMove?.targetStatus}</strong>. Notes bersifat
+                        opsional dan akan masuk audit log.
                     </p>
                     <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-                        <span>
-                            Reason <span className="text-red-600">*</span>
-                        </span>
+                        <span>Notes / Reason</span>
                         <textarea
-                            value={backwardReason}
+                            value={moveReason}
                             onChange={(event) =>
-                                setBackwardReason(event.target.value)
+                                setMoveReason(event.target.value)
                             }
                             className={`${inputClass} min-h-28`}
-                            required
                         />
                     </label>
                     <div className="flex justify-end gap-2">
                         <button
                             type="button"
-                            onClick={() => setBackwardMove(null)}
+                            onClick={() => setPendingMove(null)}
                             className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
                         >
                             Cancel
@@ -348,6 +360,40 @@ export default function ProjectIndex({
                 </form>
             </Modal>
         </AppLayout>
+    );
+}
+
+function moveProject(
+    columns: ProjectIndexProps['columns'],
+    projectId: number,
+    targetStatus: ProjectStatus,
+) {
+    let movedProject: ProjectSummary | null = null;
+
+    const nextColumns = columns.map((column) => {
+        const projects = column.projects.filter((project) => {
+            if (project.id !== projectId) {
+                return true;
+            }
+
+            movedProject = { ...project, status: targetStatus };
+
+            return false;
+        });
+
+        return { ...column, projects };
+    });
+
+    if (! movedProject) {
+        return columns;
+    }
+
+    const moved = movedProject;
+
+    return nextColumns.map((column) =>
+        column.status === targetStatus
+            ? { ...column, projects: [moved, ...column.projects] }
+            : column,
     );
 }
 

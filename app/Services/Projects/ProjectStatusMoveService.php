@@ -3,6 +3,7 @@
 namespace App\Services\Projects;
 
 use App\Enums\ProjectStatus;
+use App\Events\ProjectBoardChanged;
 use App\Exceptions\ProjectLifecycleException;
 use App\Models\Project;
 use App\Models\User;
@@ -33,6 +34,7 @@ class ProjectStatusMoveService
 
     public function __construct(
         private readonly ProjectLifecycleService $lifecycleService,
+        private readonly ProjectAuditLogger $auditLogger,
     ) {}
 
     /**
@@ -72,15 +74,11 @@ class ProjectStatusMoveService
 
         $reason = trim((string) $reason);
 
-        if ($reason === '') {
-            throw ValidationException::withMessages([
-                'reason' => ['Reason is required when project status moves backward.'],
-            ]);
-        }
-
         return DB::transaction(function () use ($project, $currentStatus, $targetStatus, $actor, $reason): Project {
             $project->forceFill(['status' => $targetStatus])->save();
-            $this->recordHistory($project, $currentStatus, $targetStatus, $actor, $reason, 'drag');
+            $this->recordHistory($project, $currentStatus, $targetStatus, $actor, $reason === '' ? null : $reason, 'drag');
+            $this->recordAudit($project, $currentStatus, $targetStatus, $actor, $reason === '' ? null : $reason);
+            $this->broadcastChange($project, $currentStatus, $targetStatus, $actor, 'project_status_moved');
 
             return $project->refresh();
         });
@@ -108,6 +106,8 @@ class ProjectStatusMoveService
         }
 
         $this->recordHistory($project, $currentStatus, $targetStatus, $actor, null, 'drag');
+        $this->recordAudit($project, $currentStatus, $targetStatus, $actor, null);
+        $this->broadcastChange($project, $currentStatus, $targetStatus, $actor, 'project_status_moved');
 
         return $project;
     }
@@ -140,6 +140,32 @@ class ProjectStatusMoveService
             'changed_by' => $actor->id,
             'changed_at' => now(),
             'source' => $source,
+        ]);
+    }
+
+    private function recordAudit(Project $project, ProjectStatus $fromStatus, ProjectStatus $toStatus, User $actor, ?string $reason): void
+    {
+        $this->auditLogger->log(
+            $project,
+            $actor,
+            'project_status_moved',
+            $project,
+            ['status' => $fromStatus->value],
+            ['status' => $toStatus->value],
+            $reason,
+            'drag',
+        );
+    }
+
+    private function broadcastChange(Project $project, ProjectStatus $fromStatus, ProjectStatus $toStatus, User $actor, string $action): void
+    {
+        ProjectBoardChanged::dispatch([
+            'project_id' => $project->id,
+            'old_status' => $fromStatus->value,
+            'new_status' => $toStatus->value,
+            'action' => $action,
+            'actor_id' => $actor->id,
+            'changed_at' => now()->toISOString(),
         ]);
     }
 }

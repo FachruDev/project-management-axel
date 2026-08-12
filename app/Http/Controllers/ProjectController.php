@@ -6,6 +6,7 @@ use App\Enums\AttachmentCollection;
 use App\Enums\IncentiveProfileStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\TaskStatus;
+use App\Events\ProjectBoardChanged;
 use App\Exceptions\ProjectLifecycleException;
 use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
@@ -15,6 +16,7 @@ use App\Models\IncentiveProfile;
 use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\User;
+use App\Services\Projects\ProjectAuditLogger;
 use App\Services\Projects\ProjectLifecycleService;
 use App\Services\Projects\ProjectVisibilityService;
 use App\Services\Projects\ProjectWriteService;
@@ -26,6 +28,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\Activitylog\Models\Activity;
 
 class ProjectController extends Controller
 {
@@ -33,6 +36,7 @@ class ProjectController extends Controller
         private readonly ProjectWriteService $writeService,
         private readonly ProjectLifecycleService $lifecycleService,
         private readonly ProjectVisibilityService $visibility,
+        private readonly ProjectAuditLogger $auditLogger,
     ) {}
 
     public function index(Request $request): Response
@@ -75,7 +79,17 @@ class ProjectController extends Controller
 
     public function store(StoreProjectRequest $request): RedirectResponse
     {
-        $project = $this->writeService->create($request->validated(), $this->actor($request));
+        $actor = $this->actor($request);
+        $project = $this->writeService->create($request->validated(), $actor);
+
+        $this->auditLogger->log(
+            $project,
+            $actor,
+            'project_created',
+            $project,
+            null,
+            $this->projectAuditSnapshot($project),
+        );
 
         if ($request->string('redirect_to')->toString() === 'preparation') {
             return redirect()
@@ -88,8 +102,10 @@ class ProjectController extends Controller
             ->with('success', 'Project saved.');
     }
 
-    public function show(Project $project): Response
+    public function show(Request $request, Project $project): Response
     {
+        abort_unless($this->visibility->visibleProjects(Project::query()->whereKey($project->id), $this->actor($request))->exists(), 403);
+
         return Inertia::render('projects/show', [
             'project' => $this->detail($this->loadProject($project)),
         ]);
@@ -97,7 +113,18 @@ class ProjectController extends Controller
 
     public function update(UpdateProjectRequest $request, Project $project): RedirectResponse
     {
-        $project = $this->writeService->update($project, $request->validated(), $this->actor($request));
+        $actor = $this->actor($request);
+        $oldData = $this->projectAuditSnapshot($project);
+        $project = $this->writeService->update($project, $request->validated(), $actor);
+
+        $this->auditLogger->log(
+            $project,
+            $actor,
+            'project_updated',
+            $project,
+            $oldData,
+            $this->projectAuditSnapshot($project),
+        );
 
         return redirect()
             ->route('projects.show', $project)
@@ -108,18 +135,35 @@ class ProjectController extends Controller
     {
         abort_unless($request->user()?->can('manage_projects') === true, 403);
 
+        $actor = $this->actor($request);
+        $oldData = $this->projectAuditSnapshot($project);
+        $this->auditLogger->log($project, $actor, 'project_deleted', $project, $oldData);
         $project->delete();
+        $this->broadcastProjectChange($project->id, $project->currentStatus()->value, null, 'project_deleted', $actor);
 
         return back()->with('success', 'Project deleted.');
     }
 
     public function submitApproval(Request $request, Project $project): RedirectResponse
     {
+        $actor = $this->actor($request);
+        $fromStatus = $project->currentStatus();
+
         try {
-            $project = $this->lifecycleService->submitForApproval($project, $this->actor($request));
+            $project = $this->lifecycleService->submitForApproval($project, $actor);
         } catch (ProjectLifecycleException $exception) {
             return back()->withErrors(['project' => $exception->getMessage()]);
         }
+
+        $this->auditLogger->log(
+            $project,
+            $actor,
+            'project_submitted',
+            $project,
+            ['status' => $fromStatus->value],
+            ['status' => $project->currentStatus()->value],
+        );
+        $this->broadcastProjectChange($project->id, $fromStatus->value, $project->currentStatus()->value, 'project_submitted', $actor);
 
         return redirect()
             ->route('projects.show', $project)
@@ -128,11 +172,24 @@ class ProjectController extends Controller
 
     public function resubmit(Request $request, Project $project): RedirectResponse
     {
+        $actor = $this->actor($request);
+        $fromStatus = $project->currentStatus();
+
         try {
-            $project = $this->lifecycleService->resubmit($project, $this->actor($request));
+            $project = $this->lifecycleService->resubmit($project, $actor);
         } catch (ProjectLifecycleException $exception) {
             return back()->withErrors(['project' => $exception->getMessage()]);
         }
+
+        $this->auditLogger->log(
+            $project,
+            $actor,
+            'project_resubmitted',
+            $project,
+            ['status' => $fromStatus->value],
+            ['status' => $project->currentStatus()->value],
+        );
+        $this->broadcastProjectChange($project->id, $fromStatus->value, $project->currentStatus()->value, 'project_resubmitted', $actor);
 
         return redirect()
             ->route('projects.show', $project)
@@ -141,20 +198,48 @@ class ProjectController extends Controller
 
     public function start(Request $request, Project $project): RedirectResponse
     {
+        $actor = $this->actor($request);
+        $fromStatus = $project->currentStatus();
+
         try {
-            $project = $this->lifecycleService->start($project, $this->actor($request));
+            $project = $this->lifecycleService->start($project, $actor);
         } catch (ProjectLifecycleException $exception) {
             return back()->withErrors(['project' => $exception->getMessage()]);
         }
+
+        $this->auditLogger->log(
+            $project,
+            $actor,
+            'project_started',
+            $project,
+            ['status' => $fromStatus->value],
+            ['status' => $project->currentStatus()->value],
+        );
+        $this->broadcastProjectChange($project->id, $fromStatus->value, $project->currentStatus()->value, 'project_started', $actor);
 
         return redirect()
             ->route('projects.show', $project)
             ->with('success', 'Project started.');
     }
 
-    public function refreshStatus(Project $project): RedirectResponse
+    public function refreshStatus(Request $request, Project $project): RedirectResponse
     {
+        $actor = $this->actor($request);
+        $fromStatus = $project->currentStatus();
         $project = $this->lifecycleService->refreshAutomaticStatus($project);
+
+        $this->auditLogger->log(
+            $project,
+            $actor,
+            'project_status_refreshed',
+            $project,
+            ['status' => $fromStatus->value],
+            ['status' => $project->currentStatus()->value],
+        );
+
+        if ($fromStatus !== $project->currentStatus()) {
+            $this->broadcastProjectChange($project->id, $fromStatus->value, $project->currentStatus()->value, 'project_status_refreshed', $actor);
+        }
 
         return redirect()
             ->route('projects.show', $project)
@@ -163,11 +248,24 @@ class ProjectController extends Controller
 
     public function close(Request $request, Project $project): RedirectResponse
     {
+        $actor = $this->actor($request);
+        $fromStatus = $project->currentStatus();
+
         try {
-            $project = $this->lifecycleService->close($project, $this->actor($request));
+            $project = $this->lifecycleService->close($project, $actor);
         } catch (ProjectLifecycleException $exception) {
             return back()->withErrors(['project' => $exception->getMessage()]);
         }
+
+        $this->auditLogger->log(
+            $project,
+            $actor,
+            'project_closed',
+            $project,
+            ['status' => $fromStatus->value],
+            ['status' => $project->currentStatus()->value],
+        );
+        $this->broadcastProjectChange($project->id, $fromStatus->value, $project->currentStatus()->value, 'project_closed', $actor);
 
         return redirect()
             ->route('projects.show', $project)
@@ -245,6 +343,7 @@ class ProjectController extends Controller
                 'collection' => $this->attachmentCollectionValue($attachment),
                 'original_name' => $attachment->original_name,
             ])->values()->all(),
+            'audit_logs' => $this->auditLogs($project),
         ];
     }
 
@@ -422,5 +521,69 @@ class ProjectController extends Controller
         }
 
         return $value === null ? null : (string) $value;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function projectAuditSnapshot(Project $project): array
+    {
+        return $this->auditLogger->snapshot($project, [
+            'name',
+            'project_date',
+            'status',
+            'mandays',
+            'incentive_profile_id',
+            'pm_user_id',
+            'request_user_id',
+            'location',
+            'urs_date',
+            'urs_number',
+            'plan_start_date',
+            'plan_end_date',
+            'actual_start_date',
+            'actual_end_date',
+            'uat_date',
+            'bast_date',
+        ]);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function auditLogs(Project $project): array
+    {
+        return Activity::query()
+            ->with('causer')
+            ->forSubject($project)
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->map(fn (Activity $activity): array => [
+                'id' => $activity->id,
+                'action' => (string) ($activity->event ?? $activity->description),
+                'description' => $activity->description,
+                'entity_type' => $activity->getExtraProperty('entity_label'),
+                'entity_id' => $activity->getExtraProperty('entity_id'),
+                'actor' => $activity->causer instanceof User ? $this->userOption($activity->causer) : null,
+                'old' => $activity->getExtraProperty('old'),
+                'new' => $activity->getExtraProperty('new'),
+                'reason' => $activity->getExtraProperty('reason'),
+                'source' => $activity->getExtraProperty('source'),
+                'changed_at' => $activity->getExtraProperty('changed_at') ?? $this->dateString($activity->created_at),
+            ])
+            ->all();
+    }
+
+    private function broadcastProjectChange(int $projectId, ?string $oldStatus, ?string $newStatus, string $action, User $actor): void
+    {
+        ProjectBoardChanged::dispatch([
+            'project_id' => $projectId,
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+            'action' => $action,
+            'actor_id' => $actor->id,
+            'changed_at' => now()->toISOString(),
+        ]);
     }
 }

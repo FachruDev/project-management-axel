@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ProjectStatus;
+use App\Events\ProjectBoardChanged;
 use App\Exceptions\ProjectLifecycleException;
 use App\Http\Requests\RejectProjectRequest;
 use App\Models\Customer;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\Projects\ProjectAuditLogger;
 use App\Services\Projects\ProjectLifecycleService;
 use DateTimeInterface;
 use Illuminate\Http\RedirectResponse;
@@ -19,6 +21,7 @@ class ProjectApprovalController extends Controller
 {
     public function __construct(
         private readonly ProjectLifecycleService $lifecycleService,
+        private readonly ProjectAuditLogger $auditLogger,
     ) {}
 
     public function index(Request $request): Response
@@ -79,11 +82,24 @@ class ProjectApprovalController extends Controller
 
     public function approve(Request $request, Project $project): RedirectResponse
     {
+        $actor = $this->actor($request);
+        $fromStatus = $project->currentStatus();
+
         try {
-            $this->lifecycleService->approve($project, $this->actor($request));
+            $project = $this->lifecycleService->approve($project, $actor);
         } catch (ProjectLifecycleException $exception) {
             return back()->withErrors(['project' => $exception->getMessage()]);
         }
+
+        $this->auditLogger->log(
+            $project,
+            $actor,
+            'project_approved',
+            $project,
+            ['status' => $fromStatus->value],
+            ['status' => $project->currentStatus()->value],
+        );
+        $this->broadcastProjectChange($project, $fromStatus->value, $project->currentStatus()->value, 'project_approved', $actor);
 
         return redirect()
             ->route('project-approvals.index')
@@ -92,11 +108,26 @@ class ProjectApprovalController extends Controller
 
     public function reject(RejectProjectRequest $request, Project $project): RedirectResponse
     {
+        $actor = $this->actor($request);
+        $fromStatus = $project->currentStatus();
+        $notes = (string) $request->validated('rejection_notes');
+
         try {
-            $this->lifecycleService->reject($project, $this->actor($request), (string) $request->validated('rejection_notes'));
+            $project = $this->lifecycleService->reject($project, $actor, $notes);
         } catch (ProjectLifecycleException $exception) {
             return back()->withErrors(['project' => $exception->getMessage()]);
         }
+
+        $this->auditLogger->log(
+            $project,
+            $actor,
+            'project_rejected',
+            $project,
+            ['status' => $fromStatus->value],
+            ['status' => $project->currentStatus()->value],
+            $notes,
+        );
+        $this->broadcastProjectChange($project, $fromStatus->value, $project->currentStatus()->value, 'project_rejected', $actor);
 
         return redirect()
             ->route('project-approvals.index')
@@ -132,5 +163,17 @@ class ProjectApprovalController extends Controller
         }
 
         return $value === null ? null : (string) $value;
+    }
+
+    private function broadcastProjectChange(Project $project, ?string $oldStatus, ?string $newStatus, string $action, User $actor): void
+    {
+        ProjectBoardChanged::dispatch([
+            'project_id' => $project->id,
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+            'action' => $action,
+            'actor_id' => $actor->id,
+            'changed_at' => now()->toISOString(),
+        ]);
     }
 }

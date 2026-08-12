@@ -3,12 +3,19 @@
 namespace App\Services\Projects;
 
 use App\Enums\TaskStatus;
+use App\Events\ProjectBoardChanged;
+use App\Events\TaskBoardChanged;
 use App\Models\ProjectTask;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ProjectTaskTransitionService
 {
+    public function __construct(
+        private readonly ProjectAuditLogger $auditLogger,
+    ) {}
+
     /**
      * @var array<string, array<int, TaskStatus>>
      */
@@ -20,7 +27,7 @@ class ProjectTaskTransitionService
         'cancelled' => [],
     ];
 
-    public function updateStatus(ProjectTask $task, TaskStatus $targetStatus): ProjectTask
+    public function updateStatus(ProjectTask $task, TaskStatus $targetStatus, User $actor, ?string $reason = null): ProjectTask
     {
         $currentStatus = $this->currentStatus($task);
 
@@ -34,14 +41,48 @@ class ProjectTaskTransitionService
             ]);
         }
 
-        return DB::transaction(function () use ($task, $currentStatus, $targetStatus): ProjectTask {
+        return DB::transaction(function () use ($task, $currentStatus, $targetStatus, $actor, $reason): ProjectTask {
             $task->forceFill([
                 'status' => $targetStatus,
                 'actual_start_date' => $this->actualStartDate($task, $currentStatus, $targetStatus),
                 'actual_end_date' => $targetStatus === TaskStatus::Done ? ($task->actual_end_date ?? today()) : null,
             ])->save();
 
-            return $task->refresh();
+            $task = $task->refresh()->load('project');
+            $project = $task->project;
+
+            $this->auditLogger->log(
+                $project,
+                $actor,
+                'task_status_moved',
+                $task,
+                ['status' => $currentStatus->value],
+                ['status' => $targetStatus->value],
+                $reason,
+                'kanban',
+            );
+
+            TaskBoardChanged::dispatch([
+                'task_id' => $task->id,
+                'project_id' => $project->id,
+                'old_status' => $currentStatus->value,
+                'new_status' => $targetStatus->value,
+                'action' => 'task_status_moved',
+                'actor_id' => $actor->id,
+                'changed_at' => now()->toISOString(),
+            ]);
+
+            ProjectBoardChanged::dispatch([
+                'project_id' => $project->id,
+                'task_id' => $task->id,
+                'old_status' => $currentStatus->value,
+                'new_status' => $targetStatus->value,
+                'action' => 'task_status_moved',
+                'actor_id' => $actor->id,
+                'changed_at' => now()->toISOString(),
+            ]);
+
+            return $task;
         });
     }
 

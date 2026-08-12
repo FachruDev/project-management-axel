@@ -364,7 +364,7 @@ class ProjectPageWorkflowTest extends TestCase
         ]);
     }
 
-    public function test_project_status_move_back_one_step_requires_reason(): void
+    public function test_project_status_move_back_one_step_accepts_optional_reason(): void
     {
         $user = $this->userWithPermissions(['manage_projects']);
         $project = Project::factory()->create(['status' => ProjectStatus::Ongoing]);
@@ -372,13 +372,6 @@ class ProjectPageWorkflowTest extends TestCase
         $this->actingAs($user)
             ->patch(route('projects.status-move', $project), [
                 'target_status' => ProjectStatus::Planning->value,
-            ])
-            ->assertSessionHasErrors('reason');
-
-        $this->actingAs($user)
-            ->patch(route('projects.status-move', $project), [
-                'target_status' => ProjectStatus::Planning->value,
-                'reason' => 'Timeline needs re-planning.',
             ])
             ->assertSessionHasNoErrors();
 
@@ -389,7 +382,7 @@ class ProjectPageWorkflowTest extends TestCase
             'project_id' => $project->id,
             'from_status' => ProjectStatus::Ongoing->value,
             'to_status' => ProjectStatus::Planning->value,
-            'reason' => 'Timeline needs re-planning.',
+            'reason' => null,
         ]);
     }
 

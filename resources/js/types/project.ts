@@ -115,6 +115,21 @@ export type ProjectDetail = ProjectSummary & {
         collection: string;
         original_name: string;
     }>;
+    audit_logs: ProjectAuditEntry[];
+};
+
+export type ProjectAuditEntry = {
+    id: number;
+    action: string;
+    description: string;
+    entity_type: string | null;
+    entity_id: number | string | null;
+    actor: UserOption | null;
+    old: Record<string, unknown> | null;
+    new: Record<string, unknown> | null;
+    reason: string | null;
+    source: string | null;
+    changed_at: string | null;
 };
 
 export type ProjectIndexProps = {

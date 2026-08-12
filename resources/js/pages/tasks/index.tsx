@@ -1,6 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
+import { useEcho } from '@laravel/echo-react';
 import type { FormEvent, ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { show as projectShow } from '@/actions/App/Http/Controllers/ProjectController';
 import { create as createProjectTasks } from '@/actions/App/Http/Controllers/ProjectBulkTaskController';
 import bulkDeleteTasks from '@/actions/App/Http/Controllers/ProjectTaskBulkDeleteController';
@@ -12,6 +13,7 @@ import {
     KanbanBoard,
     KanbanLane,
 } from '@/components/kanban';
+import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { AppLayout } from '@/layouts/app-layout';
 import type {
@@ -32,17 +34,48 @@ const taskTone: Record<ProjectTaskStatus, string> = {
     cancelled: 'border-red-200 bg-pastel-red text-red-700',
 };
 
+type PendingMove = {
+    task: TaskKanbanCard;
+    status: ProjectTaskStatus;
+};
+
+type BoardChangedEvent = {
+    actor_id?: number | null;
+};
+
 export default function TaskBoard({ columns, filters, options }: TaskBoardProps) {
     const [search, setSearch] = useState(filters.search);
     const [projectId, setProjectId] = useState(filters.project_id);
     const [picUserId, setPicUserId] = useState(filters.pic_user_id);
     const [taskTypeId, setTaskTypeId] = useState(filters.task_type_id);
     const [due, setDue] = useState(filters.due);
+    const [boardColumns, setBoardColumns] = useState(columns);
+    const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+    const [moveReason, setMoveReason] = useState('');
     const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
     const flash = usePage().props.flash as { success?: string | null } | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
     const { auth } = usePage().props as unknown as { auth: Auth };
     const canManageTasks = auth.user?.permissions.includes('manage_tasks') ?? false;
+
+    useEffect(() => {
+        setBoardColumns(columns);
+    }, [columns]);
+
+    useEcho(
+        'task-board',
+        ['.task.board.changed'],
+        (event: BoardChangedEvent) => {
+            if (event.actor_id === auth.user?.id) {
+                return;
+            }
+
+            router.reload({
+                only: ['columns'],
+            });
+        },
+        [auth.user?.id],
+    );
 
     function submitFilters(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -63,16 +96,45 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
         );
     }
 
-    function patchStatus(task: TaskKanbanCard, status: ProjectTaskStatus) {
+    function requestStatus(task: TaskKanbanCard, status: ProjectTaskStatus) {
+        if (task.status === status) {
+            return;
+        }
+
+        setPendingMove({ task, status });
+        setMoveReason('');
+    }
+
+    function submitMove(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+
+        if (! pendingMove) {
+            return;
+        }
+
+        const previousColumns = boardColumns;
+        const { task, status } = pendingMove;
+
         router.patch(
             updateTaskStatus.url(task.id),
-            { status },
-            { preserveScroll: true },
+            { status, reason: moveReason },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                only: ['columns', 'flash'],
+                onBefore: () => {
+                    setBoardColumns(moveTask(previousColumns, task.id, status));
+                },
+                onError: () => {
+                    setBoardColumns(previousColumns);
+                },
+                onSuccess: () => setPendingMove(null),
+            },
         );
     }
 
     function handleDrop(taskId: string, laneStatus: string) {
-        const task = columns
+        const task = boardColumns
             .flatMap((column) => column.tasks)
             .find((item) => String(item.id) === taskId);
         const status = laneStatus as ProjectTaskStatus;
@@ -81,7 +143,7 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
             return;
         }
 
-        patchStatus(task, status);
+        requestStatus(task, status);
     }
 
     function toggleTaskSelection(taskId: number) {
@@ -136,6 +198,7 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
 
             {flash?.success && <Alert tone="success">{flash.success}</Alert>}
             {errors?.status && <Alert tone="danger">{errors.status}</Alert>}
+            {errors?.reason && <Alert tone="danger">{errors.reason}</Alert>}
 
             <form
                 onSubmit={submitFilters}
@@ -219,7 +282,7 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
             )}
 
             <KanbanBoard onDropItem={handleDrop}>
-                {columns.map((column) => (
+                {boardColumns.map((column) => (
                     <KanbanLane
                         key={column.status}
                         id={column.status}
@@ -231,7 +294,7 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
                             <TaskCard
                                 key={task.id}
                                 task={task}
-                                onStatus={patchStatus}
+                                onStatus={requestStatus}
                                 selected={selectedTaskIds.includes(task.id)}
                                 canManageTasks={canManageTasks}
                                 onToggleSelected={toggleTaskSelection}
@@ -246,7 +309,79 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
                     </KanbanLane>
                 ))}
             </KanbanBoard>
+
+            <Modal
+                open={pendingMove !== null}
+                title="Task Status Notes"
+                onClose={() => setPendingMove(null)}
+            >
+                <form onSubmit={submitMove} className="space-y-4">
+                    <p className="text-sm text-slate-600">
+                        Task akan dipindahkan dari{' '}
+                        <strong>{pendingMove?.task.status}</strong> ke{' '}
+                        <strong>{pendingMove?.status}</strong>. Notes bersifat
+                        opsional dan akan masuk audit log.
+                    </p>
+                    <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                        <span>Notes / Reason</span>
+                        <textarea
+                            value={moveReason}
+                            onChange={(event) => setMoveReason(event.target.value)}
+                            className={`${inputClass} min-h-28`}
+                        />
+                    </label>
+                    <div className="flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setPendingMove(null)}
+                            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                        >
+                            Move Status
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </AppLayout>
+    );
+}
+
+function moveTask(
+    columns: TaskBoardProps['columns'],
+    taskId: number,
+    targetStatus: ProjectTaskStatus,
+) {
+    let movedTask: TaskKanbanCard | null = null;
+
+    const nextColumns = columns.map((column) => {
+        const tasks = column.tasks.filter((task) => {
+            if (task.id !== taskId) {
+                return true;
+            }
+
+            movedTask = { ...task, status: targetStatus };
+
+            return false;
+        });
+
+        return { ...column, tasks };
+    });
+
+    if (! movedTask) {
+        return columns;
+    }
+
+    const moved = movedTask;
+
+    return nextColumns.map((column) =>
+        column.status === targetStatus
+            ? { ...column, tasks: [moved, ...column.tasks] }
+            : column,
     );
 }
 

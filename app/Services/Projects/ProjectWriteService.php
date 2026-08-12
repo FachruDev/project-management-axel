@@ -9,6 +9,7 @@ use App\Models\Attachment;
 use App\Models\IncentivePicLevelRule;
 use App\Models\IncentiveProjectRoleRule;
 use App\Models\Project;
+use App\Models\ProjectAccessRule;
 use App\Models\ProjectMember;
 use App\Models\ProjectTask;
 use App\Models\TaskType;
@@ -22,6 +23,7 @@ class ProjectWriteService
 {
     public function __construct(
         private readonly ProjectLifecycleService $lifecycleService,
+        private readonly ProjectAuditLogger $auditLogger,
     ) {}
 
     /**
@@ -75,6 +77,8 @@ class ProjectWriteService
         $this->ensurePreparationEditableProject($project);
 
         return DB::transaction(function () use ($project, $data, $actor): Project {
+            $oldData = $this->projectPreparationSnapshot($project);
+
             $project->update([
                 'pm_user_id' => $data['pm_user_id'],
                 'request_user_id' => $data['request_user_id'] ?? null,
@@ -88,12 +92,23 @@ class ProjectWriteService
                 'updated_by' => $actor->id,
             ]);
 
-            $this->syncMembers($project, Arr::wrap($data['members'] ?? []));
+            $this->syncMembers($project, Arr::wrap($data['members'] ?? []), $actor);
             $this->syncAccessRules($project, Arr::wrap($data['access_rules'] ?? []), $actor);
             $this->syncTasks($project, Arr::wrap($data['tasks'] ?? []), $actor);
             $this->storeProjectFiles($project, $data, $actor);
 
-            return $this->lifecycleService->refreshAutomaticStatus($project->refresh());
+            $project = $this->lifecycleService->refreshAutomaticStatus($project->refresh());
+
+            $this->auditLogger->log(
+                $project,
+                $actor,
+                'project_preparation_updated',
+                $project,
+                $oldData,
+                $this->projectPreparationSnapshot($project),
+            );
+
+            return $project;
         });
     }
 
@@ -119,7 +134,7 @@ class ProjectWriteService
     /**
      * @param  array<int, array<string, mixed>>  $members
      */
-    private function syncMembers(Project $project, array $members): void
+    private function syncMembers(Project $project, array $members, User $actor): void
     {
         $submittedUserIds = collect($members)
             ->pluck('user_id')
@@ -129,7 +144,12 @@ class ProjectWriteService
 
         $project->members()
             ->whereNotIn('user_id', $submittedUserIds)
-            ->delete();
+            ->get()
+            ->each(function (ProjectMember $member) use ($project, $actor): void {
+                $oldData = $this->memberSnapshot($member);
+                $member->delete();
+                $this->auditLogger->log($project, $actor, 'member_deleted', $member, $oldData, null, null, 'preparation');
+            });
 
         foreach ($members as $member) {
             $roleRule = IncentiveProjectRoleRule::query()
@@ -143,20 +163,38 @@ class ProjectWriteService
                     ->findOrFail((int) $member['incentive_pic_level_rule_id']);
             }
 
-            ProjectMember::updateOrCreate(
+            $projectMember = ProjectMember::query()
+                ->where('project_id', $project->id)
+                ->where('user_id', (int) $member['user_id'])
+                ->first();
+            $oldData = $projectMember instanceof ProjectMember ? $this->memberSnapshot($projectMember) : null;
+            $payload = [
+                'incentive_project_role_rule_id' => $roleRule->id,
+                'incentive_pic_level_rule_id' => $picRule?->id,
+                'project_role_code' => $roleRule->role_code,
+                'project_role_name' => $roleRule->role_name,
+                'pic_level_code' => $picRule?->level_code,
+                'pic_level_name' => $picRule?->level_name,
+                'is_support' => (bool) $member['is_support'] || $roleRule->is_support,
+            ];
+
+            $projectMember = ProjectMember::updateOrCreate(
                 [
                     'project_id' => $project->id,
                     'user_id' => (int) $member['user_id'],
                 ],
-                [
-                    'incentive_project_role_rule_id' => $roleRule->id,
-                    'incentive_pic_level_rule_id' => $picRule?->id,
-                    'project_role_code' => $roleRule->role_code,
-                    'project_role_name' => $roleRule->role_name,
-                    'pic_level_code' => $picRule?->level_code,
-                    'pic_level_name' => $picRule?->level_name,
-                    'is_support' => (bool) $member['is_support'] || $roleRule->is_support,
-                ],
+                $payload,
+            );
+
+            $this->auditLogger->log(
+                $project,
+                $actor,
+                $oldData === null ? 'member_created' : 'member_updated',
+                $projectMember,
+                $oldData,
+                $this->memberSnapshot($projectMember),
+                null,
+                'preparation',
             );
         }
     }
@@ -166,14 +204,31 @@ class ProjectWriteService
      */
     private function syncAccessRules(Project $project, array $accessRules, User $actor): void
     {
-        $project->accessRules()->delete();
+        $project->accessRules()
+            ->get()
+            ->each(function (ProjectAccessRule $accessRule) use ($project, $actor): void {
+                $oldData = $this->accessRuleSnapshot($accessRule);
+                $accessRule->delete();
+                $this->auditLogger->log($project, $actor, 'access_rule_deleted', $accessRule, $oldData, null, null, 'preparation');
+            });
 
         foreach ($accessRules as $accessRule) {
-            $project->accessRules()->create([
+            $createdRule = $project->accessRules()->create([
                 'user_id' => (int) $accessRule['user_id'],
                 'permission' => (string) $accessRule['permission'],
                 'granted_by' => $actor->id,
             ]);
+
+            $this->auditLogger->log(
+                $project,
+                $actor,
+                'access_rule_created',
+                $createdRule,
+                null,
+                $this->accessRuleSnapshot($createdRule),
+                null,
+                'preparation',
+            );
         }
     }
 
@@ -191,9 +246,20 @@ class ProjectWriteService
         if ($submittedTaskIds->isNotEmpty()) {
             $project->tasks()
                 ->whereNotIn('id', $submittedTaskIds)
-                ->delete();
+                ->get()
+                ->each(function (ProjectTask $task) use ($project, $actor): void {
+                    $oldData = $this->taskSnapshot($task);
+                    $task->delete();
+                    $this->auditLogger->log($project, $actor, 'task_deleted', $task, $oldData, null, null, 'preparation');
+                });
         } elseif ($tasks === []) {
-            $project->tasks()->delete();
+            $project->tasks()
+                ->get()
+                ->each(function (ProjectTask $task) use ($project, $actor): void {
+                    $oldData = $this->taskSnapshot($task);
+                    $task->delete();
+                    $this->auditLogger->log($project, $actor, 'task_deleted', $task, $oldData, null, null, 'preparation');
+                });
         }
 
         $membersByUserId = $project->members()->get()->keyBy('user_id');
@@ -219,14 +285,35 @@ class ProjectWriteService
                 $projectTask = $project->tasks()
                     ->whereKey((int) $task['id'])
                     ->firstOrFail();
+                $oldData = $this->taskSnapshot($projectTask);
 
                 $projectTask->update($payload);
+                $this->auditLogger->log(
+                    $project,
+                    $actor,
+                    'task_updated',
+                    $projectTask,
+                    $oldData,
+                    $this->taskSnapshot($projectTask->refresh()),
+                    null,
+                    'preparation',
+                );
                 $this->storeTaskFiles($projectTask, Arr::wrap($task['attachments'] ?? []), $actor);
 
                 continue;
             }
 
             $projectTask = $project->tasks()->create($payload);
+            $this->auditLogger->log(
+                $project,
+                $actor,
+                'task_created',
+                $projectTask,
+                null,
+                $this->taskSnapshot($projectTask),
+                null,
+                'preparation',
+            );
             $this->storeTaskFiles($projectTask, Arr::wrap($task['attachments'] ?? []), $actor);
         }
     }
@@ -282,7 +369,7 @@ class ProjectWriteService
             ]);
         }
 
-        Attachment::create([
+        $attachment = Attachment::create([
             'attachable_type' => Project::class,
             'attachable_id' => $project->id,
             'collection' => $collection,
@@ -293,6 +380,17 @@ class ProjectWriteService
             'size' => $file->getSize(),
             'uploaded_by' => $actor->id,
         ]);
+
+        $this->auditLogger->log(
+            $project,
+            $actor,
+            'attachment_uploaded',
+            $attachment,
+            null,
+            $this->attachmentSnapshot($attachment),
+            null,
+            'preparation',
+        );
     }
 
     /**
@@ -313,7 +411,7 @@ class ProjectWriteService
                 ]);
             }
 
-            Attachment::create([
+            $attachment = Attachment::create([
                 'attachable_type' => ProjectTask::class,
                 'attachable_id' => $task->id,
                 'collection' => AttachmentCollection::TaskAttachment,
@@ -324,6 +422,18 @@ class ProjectWriteService
                 'size' => $file->getSize(),
                 'uploaded_by' => $actor->id,
             ]);
+
+            $this->auditLogger->log(
+                $task->project,
+                $actor,
+                'attachment_uploaded',
+                $attachment,
+                null,
+                $this->attachmentSnapshot($attachment),
+                null,
+                'preparation',
+                ['parent_entity_type' => $task->getMorphClass(), 'parent_entity_id' => $task->id],
+            );
         }
     }
 
@@ -370,6 +480,94 @@ class ProjectWriteService
 
         throw ValidationException::withMessages([
             'project' => ['Closed project preparation cannot be edited.'],
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function projectPreparationSnapshot(Project $project): array
+    {
+        return $this->auditLogger->snapshot($project, [
+            'status',
+            'pm_user_id',
+            'request_user_id',
+            'location',
+            'urs_date',
+            'urs_number',
+            'plan_start_date',
+            'plan_end_date',
+            'uat_date',
+            'bast_date',
+            'updated_by',
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function taskSnapshot(ProjectTask $task): array
+    {
+        return $this->auditLogger->snapshot($task, [
+            'project_id',
+            'task_type_id',
+            'project_member_id',
+            'name',
+            'status',
+            'description',
+            'plan_start_date',
+            'plan_end_date',
+            'actual_start_date',
+            'actual_end_date',
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function attachmentSnapshot(Attachment $attachment): array
+    {
+        return $this->auditLogger->snapshot($attachment, [
+            'attachable_type',
+            'attachable_id',
+            'collection',
+            'disk',
+            'path',
+            'original_name',
+            'mime_type',
+            'size',
+            'uploaded_by',
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function memberSnapshot(ProjectMember $member): array
+    {
+        return $this->auditLogger->snapshot($member, [
+            'project_id',
+            'user_id',
+            'incentive_project_role_rule_id',
+            'incentive_pic_level_rule_id',
+            'project_role_code',
+            'project_role_name',
+            'pic_level_code',
+            'pic_level_name',
+            'is_support',
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function accessRuleSnapshot(ProjectAccessRule $accessRule): array
+    {
+        return $this->auditLogger->snapshot($accessRule, [
+            'project_id',
+            'user_id',
+            'permission',
+            'granted_by',
         ]);
     }
 }

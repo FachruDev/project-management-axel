@@ -24,6 +24,7 @@ class UpdateProjectTaskStatusRequest extends FormRequest
     {
         return [
             'status' => ['required', 'string', Rule::in(['todo', 'assigned', 'inprogress', 'done', 'cancelled'])],
+            'reason' => ['nullable', 'string', 'max:2000'],
         ];
     }
 }
