@@ -1,15 +1,15 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import type { FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
+import bulkDeleteProjects from '@/actions/App/Http/Controllers/ProjectBulkDeleteController';
 import {
     destroy,
     index,
     show,
 } from '@/actions/App/Http/Controllers/ProjectController';
-import bulkDeleteProjects from '@/actions/App/Http/Controllers/ProjectBulkDeleteController';
 import { show as preparationShow } from '@/actions/App/Http/Controllers/ProjectPreparationController';
-import statusMove from '@/actions/App/Http/Controllers/ProjectStatusMoveController';
 import preparationIndex from '@/actions/App/Http/Controllers/ProjectPreparationIndexController';
+import statusMove from '@/actions/App/Http/Controllers/ProjectStatusMoveController';
 import taskBoardIndex from '@/actions/App/Http/Controllers/TaskBoardController';
 import {
     DraggableKanbanCard,
