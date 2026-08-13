@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { Download, FileSpreadsheet, Upload } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 
@@ -7,6 +7,7 @@ type Props = {
     exportUrl: string;
     templateUrl: string;
     importUrl: string;
+    guideUrl?: string;
 };
 
 const linkClass =
@@ -18,6 +19,7 @@ export function ExcelTransferActions({
     exportUrl,
     templateUrl,
     importUrl,
+    guideUrl,
 }: Props) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [importing, setImporting] = useState(false);
@@ -59,6 +61,12 @@ export function ExcelTransferActions({
                 <FileSpreadsheet className="size-4" />
                 Template
             </a>
+            {guideUrl && (
+                <a href={guideUrl} className={linkClass}>
+                    <FileText className="size-4" />
+                    Guide PDF
+                </a>
+            )}
             <button
                 type="button"
                 onClick={chooseFile}

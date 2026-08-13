@@ -8,12 +8,13 @@ import {
     submitApproval,
     update,
 } from '@/actions/App/Http/Controllers/ProjectController';
+import { show as preparationShow } from '@/actions/App/Http/Controllers/ProjectPreparationController';
 import {
     exportMethod as exportProjectPreparations,
+    guide as projectPreparationGuide,
     importMethod as importProjectPreparations,
     template as projectPreparationTemplate,
 } from '@/actions/App/Http/Controllers/ProjectPreparationExcelController';
-import { show as preparationShow } from '@/actions/App/Http/Controllers/ProjectPreparationController';
 import preparationIndex from '@/actions/App/Http/Controllers/ProjectPreparationIndexController';
 import { ExcelTransferActions } from '@/components/excel-transfer-actions';
 import { Modal } from '@/components/modal';
@@ -159,6 +160,7 @@ export default function ProjectPreparationIndex({
                             exportUrl={exportProjectPreparations.url()}
                             templateUrl={projectPreparationTemplate.url()}
                             importUrl={importProjectPreparations.url()}
+                            guideUrl={projectPreparationGuide.url()}
                         />
                         <button
                             type="button"

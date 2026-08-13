@@ -65,6 +65,9 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::get('import-templates/project-preparations', [ProjectPreparationExcelController::class, 'template'])
         ->middleware('can:import_project_preparations')
         ->name('import-templates.project-preparations');
+    Route::get('import-guides/project-preparations', [ProjectPreparationExcelController::class, 'guide'])
+        ->middleware('can:import_project_preparations')
+        ->name('import-guides.project-preparations');
     Route::post('imports/project-preparations', [ProjectPreparationExcelController::class, 'import'])
         ->middleware('can:import_project_preparations')
         ->name('imports.project-preparations');

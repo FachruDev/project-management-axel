@@ -384,6 +384,61 @@ class ExcelImportExportTest extends TestCase
         $this->assertSame('Project Contoh Implementasi', $spreadsheet->getSheet(4)->toArray()[1][2]);
     }
 
+    public function test_project_preparation_import_guide_pdf_contains_master_data_and_instructions(): void
+    {
+        $user = $this->userWithPermissions(['import_project_preparations']);
+        $profile = IncentiveProfile::factory()->create([
+            'code' => 'GUIDE',
+            'version' => 2,
+            'status' => IncentiveProfileStatus::Active,
+        ]);
+        IncentiveProjectRoleRule::factory()->create([
+            'incentive_profile_id' => $profile->id,
+            'role_code' => 'QA',
+            'role_name' => 'Quality Assurance',
+            'is_support' => true,
+        ]);
+        IncentivePicLevelRule::factory()->create([
+            'incentive_profile_id' => $profile->id,
+            'level_code' => 'SENIOR',
+            'level_name' => 'Senior',
+        ]);
+        User::factory()->create([
+            'name' => 'Guide User',
+            'email' => 'guide-user@example.test',
+            'is_active' => true,
+        ]);
+        Customer::factory()->create([
+            'name' => 'Guide Customer',
+            'email' => 'guide-customer@example.test',
+            'company_name' => 'Guide Customer Co',
+            'is_active' => true,
+        ]);
+        TaskType::factory()->create([
+            'name' => 'Guide Task Type',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('import-guides.project-preparations'));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+        $response->assertHeader('content-disposition', 'attachment; filename="project-preparation-import-guide.pdf"');
+
+        $content = $response->getContent();
+
+        $this->assertStringStartsWith('%PDF-1.4', $content);
+        $this->assertStringContainsString('Project Preparation Import Guide', $content);
+        $this->assertStringContainsString('GUIDE', $content);
+        $this->assertStringContainsString('QA', $content);
+        $this->assertStringContainsString('SENIOR', $content);
+        $this->assertStringContainsString('guide-user@example.test', $content);
+        $this->assertStringContainsString('guide-customer@example.test', $content);
+        $this->assertStringContainsString('Guide Task Type', $content);
+        $this->assertStringContainsString('Task status values: todo, assigned, inprogress, done, cancelled', $content);
+        $this->assertStringContainsString('Members is_support: use 1/true/yes/y/active/aktif', $content);
+    }
+
     /**
      * @param  array<int, string>  $permissions
      */

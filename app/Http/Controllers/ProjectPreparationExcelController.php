@@ -7,10 +7,12 @@ use App\Exports\ProjectPreparationWorkbookExport;
 use App\Http\Controllers\Concerns\HandlesExcelTransfers;
 use App\Http\Requests\ImportExcelRequest;
 use App\Services\Excel\ProjectPreparationExcelService;
+use App\Services\Excel\ProjectPreparationImportGuidePdf;
 use Illuminate\Http\RedirectResponse;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class ProjectPreparationExcelController extends Controller
 {
@@ -66,6 +68,17 @@ class ProjectPreparationExcelController extends Controller
                     ];
                 }
             }, 'project-preparations-template.xlsx'),
+        );
+    }
+
+    public function guide(ProjectPreparationImportGuidePdf $guide): Response|RedirectResponse
+    {
+        return $this->downloadFile(
+            'Project preparation guide download failed',
+            fn (): Response => response($guide->render(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="project-preparation-import-guide.pdf"',
+            ]),
         );
     }
 

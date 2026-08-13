@@ -7,6 +7,7 @@ use App\Services\Excel\ImportSummary;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 trait HandlesExcelTransfers
@@ -25,6 +26,25 @@ trait HandlesExcelTransfers
                 ->with('excel_error_title', $title)
                 ->with('excel_errors', [
                     'The Excel file could not be generated. Please try again after refreshing the page.',
+                    'Technical detail: '.$exception->getMessage(),
+                ]);
+        }
+    }
+
+    /**
+     * @param  Closure(): Response  $callback
+     */
+    protected function downloadFile(string $title, Closure $callback): Response|RedirectResponse
+    {
+        try {
+            return $callback();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()
+                ->with('excel_error_title', $title)
+                ->with('excel_errors', [
+                    'The file could not be generated. Please try again after refreshing the page.',
                     'Technical detail: '.$exception->getMessage(),
                 ]);
         }
