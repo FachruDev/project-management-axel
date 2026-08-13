@@ -36,7 +36,307 @@ class ProjectPreparationExcelService
         ];
     }
 
-    public function import(UploadedFile $file, User $actor): ImportSummary
+    public function preview(UploadedFile|string $file): ImportPreviewResult
+    {
+        $sheets = ExcelWorkbook::sheets($file, 'Project preparation import');
+        $sheetErrors = $this->sheetErrors($sheets);
+
+        if ($sheetErrors !== []) {
+            return $this->previewResult([[], [], [], [], []], $sheetErrors);
+        }
+
+        $projectRows = $sheets[0] ?? [];
+        $customerRows = $sheets[1] ?? [];
+        $memberRows = $sheets[2] ?? [];
+        $accessRuleRows = $sheets[3] ?? [];
+        $taskRows = $sheets[4] ?? [];
+        $errors = [];
+        $previewSheets = [[], [], [], [], []];
+        $projectContexts = [];
+        $memberEmailsByProject = [];
+
+        foreach ($projectRows as $index => $row) {
+            if (ExcelRow::blank($row)) {
+                continue;
+            }
+
+            $line = $index + 2;
+            $rowErrors = [];
+            $name = ExcelRow::string($row, 'name');
+            $projectDate = ExcelRow::date($row, 'project_date');
+            $mandays = ExcelRow::string($row, 'mandays');
+            $profileCode = ExcelRow::string($row, 'incentive_profile_code');
+            $profileVersion = ExcelRow::string($row, 'incentive_profile_version');
+            $pmEmail = ExcelRow::string($row, 'pm_email');
+            $location = ExcelRow::string($row, 'location');
+            $ursDate = ExcelRow::date($row, 'urs_date');
+            $ursNumber = ExcelRow::string($row, 'urs_number');
+            $planStartDate = ExcelRow::date($row, 'plan_start_date');
+            $planEndDate = ExcelRow::date($row, 'plan_end_date');
+
+            foreach ([
+                'name' => $name,
+                'project_date' => $projectDate,
+                'mandays' => $mandays,
+                'incentive_profile_code' => $profileCode,
+                'incentive_profile_version' => $profileVersion,
+                'pm_email' => $pmEmail,
+                'location' => $location,
+                'urs_date' => $ursDate,
+                'urs_number' => $ursNumber,
+                'plan_start_date' => $planStartDate,
+                'plan_end_date' => $planEndDate,
+            ] as $field => $value) {
+                if ($value === null) {
+                    $rowErrors[] = "Projects row {$line}: {$field} is required.";
+                }
+            }
+
+            $profile = $profileCode === null || $profileVersion === null ? null : IncentiveProfile::query()
+                ->where('code', $profileCode)
+                ->where('version', (int) $profileVersion)
+                ->first();
+
+            if (! $profile instanceof IncentiveProfile) {
+                $rowErrors[] = "Projects row {$line}: incentive profile {$profileCode} v{$profileVersion} was not found.";
+            }
+
+            $pm = $pmEmail === null ? null : User::query()->where('email', $pmEmail)->first();
+
+            if (! $pm instanceof User) {
+                $rowErrors[] = "Projects row {$line}: pm_email {$pmEmail} was not found.";
+            }
+
+            $requesterEmail = ExcelRow::string($row, 'requester_email');
+
+            if ($requesterEmail !== null && ! User::query()->where('email', $requesterEmail)->exists()) {
+                $rowErrors[] = "Projects row {$line}: requester_email {$requesterEmail} was not found.";
+            }
+
+            $project = $name !== null && $projectDate !== null ? $this->findProject($row, $name, $projectDate) : null;
+            $key = $this->previewProjectKey($row, $name, $projectDate);
+            array_push($errors, ...$rowErrors);
+
+            if ($key !== null) {
+                $projectContexts[$key] = [
+                    'project' => $project,
+                    'profile_id' => $profile?->id,
+                ];
+
+                if ($project instanceof Project) {
+                    foreach ($project->members()->with('user')->get() as $member) {
+                        if ($member->user?->email !== null) {
+                            $memberEmailsByProject[$key][$member->user->email] = true;
+                        }
+                    }
+                }
+            }
+
+            $previewSheets[0][] = [
+                'row' => $line,
+                'action' => $project instanceof Project ? 'update' : 'create',
+                'status' => $rowErrors === [] ? 'valid' : 'error',
+                'key' => $key,
+                'values' => [
+                    'name' => $name,
+                    'project_date' => $projectDate,
+                    'mandays' => $mandays,
+                    'incentive_profile_code' => $profileCode,
+                    'incentive_profile_version' => $profileVersion,
+                    'pm_email' => $pmEmail,
+                    'requester_email' => $requesterEmail,
+                    'location' => $location,
+                    'urs_date' => $ursDate,
+                    'urs_number' => $ursNumber,
+                    'plan_start_date' => $planStartDate,
+                    'plan_end_date' => $planEndDate,
+                    'uat_date' => ExcelRow::date($row, 'uat_date'),
+                    'bast_date' => ExcelRow::date($row, 'bast_date'),
+                ],
+                'errors' => $rowErrors,
+            ];
+        }
+
+        foreach ($memberRows as $index => $row) {
+            if (ExcelRow::blank($row)) {
+                continue;
+            }
+
+            $projectKey = $this->rowProjectKey($row);
+            $email = ExcelRow::string($row, 'user_email');
+
+            if ($projectKey !== null && $email !== null) {
+                $memberEmailsByProject[$projectKey][$email] = true;
+            }
+        }
+
+        foreach ($customerRows as $index => $row) {
+            if (ExcelRow::blank($row)) {
+                continue;
+            }
+
+            $line = $index + 2;
+            $rowErrors = [];
+            $projectKey = $this->rowProjectKey($row);
+            $customer = $this->findCustomer($row);
+
+            if ($projectKey === null || ! isset($projectContexts[$projectKey])) {
+                $rowErrors[] = "Project Customers row {$line}: project reference was not found in Projects sheet.";
+            }
+
+            if (! $customer instanceof Customer) {
+                $rowErrors[] = "Project Customers row {$line}: customer_email/customer_company_name was not found.";
+            }
+
+            array_push($errors, ...$rowErrors);
+
+            $previewSheets[1][] = $this->relationPreviewRow($line, 'sync', $projectKey, $row, $rowErrors);
+        }
+
+        foreach ($memberRows as $index => $row) {
+            if (ExcelRow::blank($row)) {
+                continue;
+            }
+
+            $line = $index + 2;
+            $rowErrors = [];
+            $projectKey = $this->rowProjectKey($row);
+            $context = $projectKey === null ? null : ($projectContexts[$projectKey] ?? null);
+            $user = $this->findUser($row, 'user_email');
+            $roleCode = ExcelRow::string($row, 'project_role_code');
+            $picLevelCode = ExcelRow::string($row, 'pic_level_code');
+
+            if ($context === null) {
+                $rowErrors[] = "Members row {$line}: project reference was not found in Projects sheet.";
+            }
+
+            if (! $user instanceof User) {
+                $rowErrors[] = "Members row {$line}: user_email was not found.";
+            }
+
+            if ($context !== null) {
+                if ($roleCode === null || ! IncentiveProjectRoleRule::query()->where('incentive_profile_id', $context['profile_id'])->where('role_code', $roleCode)->exists()) {
+                    $rowErrors[] = "Members row {$line}: project_role_code {$roleCode} was not found for project incentive profile.";
+                }
+
+                if ($picLevelCode !== null && ! IncentivePicLevelRule::query()->where('incentive_profile_id', $context['profile_id'])->where('level_code', $picLevelCode)->exists()) {
+                    $rowErrors[] = "Members row {$line}: pic_level_code {$picLevelCode} was not found for project incentive profile.";
+                }
+            }
+
+            array_push($errors, ...$rowErrors);
+
+            $previewSheets[2][] = $this->relationPreviewRow($line, 'sync', $projectKey, $row, $rowErrors);
+        }
+
+        foreach ($accessRuleRows as $index => $row) {
+            if (ExcelRow::blank($row)) {
+                continue;
+            }
+
+            $line = $index + 2;
+            $rowErrors = [];
+            $projectKey = $this->rowProjectKey($row);
+            $permission = ExcelRow::string($row, 'permission');
+
+            if ($projectKey === null || ! isset($projectContexts[$projectKey])) {
+                $rowErrors[] = "Access Rules row {$line}: project reference was not found in Projects sheet.";
+            }
+
+            if (! $this->findUser($row, 'user_email') instanceof User) {
+                $rowErrors[] = "Access Rules row {$line}: user_email was not found.";
+            }
+
+            if (! in_array($permission, ['view', 'edit', 'manage_tasks'], true)) {
+                $rowErrors[] = "Access Rules row {$line}: permission must be view, edit, or manage_tasks.";
+            }
+
+            array_push($errors, ...$rowErrors);
+
+            $previewSheets[3][] = $this->relationPreviewRow($line, 'sync', $projectKey, $row, $rowErrors);
+        }
+
+        foreach ($taskRows as $index => $row) {
+            if (ExcelRow::blank($row)) {
+                continue;
+            }
+
+            $line = $index + 2;
+            $rowErrors = [];
+            $projectKey = $this->rowProjectKey($row);
+            $context = $projectKey === null ? null : ($projectContexts[$projectKey] ?? null);
+            $project = $context['project'] ?? null;
+            $name = ExcelRow::string($row, 'name');
+            $statusValue = ExcelRow::string($row, 'status') ?? TaskStatus::Todo->value;
+            $status = TaskStatus::tryFrom($statusValue);
+            $planStartDate = ExcelRow::date($row, 'plan_start_date');
+            $planEndDate = ExcelRow::date($row, 'plan_end_date');
+            $taskTypeName = ExcelRow::string($row, 'task_type_name');
+            $picEmail = ExcelRow::string($row, 'pic_user_email');
+
+            if ($context === null) {
+                $rowErrors[] = "Tasks row {$line}: project reference was not found in Projects sheet.";
+            }
+
+            if ($name === null) {
+                $rowErrors[] = "Tasks row {$line}: name is required.";
+            }
+
+            if (! $status instanceof TaskStatus) {
+                $rowErrors[] = "Tasks row {$line}: status {$statusValue} is invalid.";
+            }
+
+            if ($planStartDate === null) {
+                $rowErrors[] = "Tasks row {$line}: valid plan_start_date is required.";
+            }
+
+            if ($planEndDate === null) {
+                $rowErrors[] = "Tasks row {$line}: valid plan_end_date is required.";
+            }
+
+            if ($taskTypeName !== null) {
+                $taskType = $project instanceof Project
+                    ? $this->findTaskType($project, $taskTypeName)
+                    : TaskType::query()->where('name', $taskTypeName)->whereNull('project_id')->first();
+
+                if (! $taskType instanceof TaskType) {
+                    $rowErrors[] = "Tasks row {$line}: task_type_name {$taskTypeName} was not found.";
+                }
+            }
+
+            if ($picEmail !== null && ! isset($memberEmailsByProject[$projectKey ?? ''][$picEmail])) {
+                $rowErrors[] = "Tasks row {$line}: pic_user_email {$picEmail} is not a project member.";
+            }
+
+            $task = $project instanceof Project && $name !== null ? $this->findTask($project, $row, $name) : null;
+            array_push($errors, ...$rowErrors);
+
+            $previewSheets[4][] = [
+                'row' => $line,
+                'action' => $task instanceof ProjectTask ? 'update' : 'create',
+                'status' => $rowErrors === [] ? 'valid' : 'error',
+                'key' => ($projectKey ?? 'unknown').' / '.($name ?? 'unnamed task'),
+                'values' => [
+                    'task_id' => ExcelRow::string($row, 'task_id'),
+                    'project_id' => ExcelRow::string($row, 'project_id'),
+                    'project_name' => ExcelRow::string($row, 'project_name'),
+                    'project_date' => ExcelRow::date($row, 'project_date'),
+                    'name' => $name,
+                    'task_type_name' => $taskTypeName,
+                    'pic_user_email' => $picEmail,
+                    'status' => $statusValue,
+                    'description' => ExcelRow::string($row, 'description'),
+                    'plan_start_date' => $planStartDate,
+                    'plan_end_date' => $planEndDate,
+                ],
+                'errors' => $rowErrors,
+            ];
+        }
+
+        return $this->previewResult($previewSheets, $errors);
+    }
+
+    public function import(UploadedFile|string $file, User $actor): ImportSummary
     {
         $sheets = ExcelWorkbook::sheets($file, 'Project preparation import');
         $sheetErrors = $this->sheetErrors($sheets);
@@ -535,6 +835,11 @@ class ProjectPreparationExcelService
         return $name !== null && $date !== null ? $name.'|'.$date : null;
     }
 
+    private function previewProjectKey(array $row, ?string $name, ?string $projectDate): ?string
+    {
+        return ExcelRow::string($row, 'project_id') ?? ($name !== null && $projectDate !== null ? $name.'|'.$projectDate : null);
+    }
+
     /**
      * @param  array<string, mixed>  $row
      */
@@ -667,5 +972,56 @@ class ProjectPreparationExcelService
             'actual_start_date',
             'actual_end_date',
         ]);
+    }
+
+    /**
+     * @param  array<int, array<int, array<string, mixed>>>  $rowsBySheet
+     * @param  array<int, string>  $errors
+     */
+    private function previewResult(array $rowsBySheet, array $errors): ImportPreviewResult
+    {
+        $sheetNames = ['Projects', 'Project Customers', 'Members', 'Access Rules', 'Tasks'];
+        $headings = $this->headings();
+        $sheets = [];
+
+        foreach ($sheetNames as $index => $sheetName) {
+            $sheets[] = [
+                'name' => $sheetName,
+                'columns' => $headings[$index],
+                'rows' => $rowsBySheet[$index] ?? [],
+            ];
+        }
+
+        $rows = collect($sheets)->flatMap(fn (array $sheet): array => $sheet['rows'])->all();
+
+        return new ImportPreviewResult(
+            $sheets,
+            $errors,
+            [
+                'total' => count($rows),
+                'valid' => count(array_filter($rows, fn (array $row): bool => $row['status'] === 'valid')),
+                'errors' => count($errors),
+                'creates' => count(array_filter($rows, fn (array $row): bool => $row['action'] === 'create' && $row['status'] === 'valid')),
+                'updates' => count(array_filter($rows, fn (array $row): bool => $row['action'] === 'update' && $row['status'] === 'valid')),
+                'skips' => count(array_filter($rows, fn (array $row): bool => ! in_array($row['action'], ['create', 'update'], true) && $row['status'] === 'valid')),
+            ],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  array<int, string>  $errors
+     * @return array<string, mixed>
+     */
+    private function relationPreviewRow(int $line, string $action, ?string $projectKey, array $row, array $errors): array
+    {
+        return [
+            'row' => $line,
+            'action' => $action,
+            'status' => $errors === [] ? 'valid' : 'error',
+            'key' => $projectKey,
+            'values' => $row,
+            'errors' => $errors,
+        ];
     }
 }

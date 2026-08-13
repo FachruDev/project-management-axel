@@ -12,9 +12,9 @@ import { show as preparationShow } from '@/actions/App/Http/Controllers/ProjectP
 import {
     exportMethod as exportProjectPreparations,
     guide as projectPreparationGuide,
-    importMethod as importProjectPreparations,
     template as projectPreparationTemplate,
 } from '@/actions/App/Http/Controllers/ProjectPreparationExcelController';
+import { create as importCreate } from '@/actions/App/Http/Controllers/ImportPreviewController';
 import preparationIndex from '@/actions/App/Http/Controllers/ProjectPreparationIndexController';
 import { ExcelTransferActions } from '@/components/excel-transfer-actions';
 import { Modal } from '@/components/modal';
@@ -159,7 +159,7 @@ export default function ProjectPreparationIndex({
                         <ExcelTransferActions
                             exportUrl={exportProjectPreparations.url()}
                             templateUrl={projectPreparationTemplate.url()}
-                            importUrl={importProjectPreparations.url()}
+                            importUrl={importCreate.url('project-preparations')}
                             guideUrl={projectPreparationGuide.url()}
                         />
                         <button

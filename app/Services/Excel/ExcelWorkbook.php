@@ -12,7 +12,7 @@ class ExcelWorkbook
     /**
      * @return array<int, array<int, array<string, mixed>>>
      */
-    public static function sheets(UploadedFile $file, string $context): array
+    public static function sheets(UploadedFile|string $file, string $context): array
     {
         try {
             return Excel::toArray(new RawExcelImport, $file);

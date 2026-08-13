@@ -9,9 +9,9 @@ import {
 } from '@/actions/App/Http/Controllers/CustomerController';
 import {
     exportMethod as exportCustomers,
-    importMethod as importCustomers,
     template as customerTemplate,
 } from '@/actions/App/Http/Controllers/CustomerExcelController';
+import { create as importCreate } from '@/actions/App/Http/Controllers/ImportPreviewController';
 import { ExcelTransferActions } from '@/components/excel-transfer-actions';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
@@ -139,7 +139,7 @@ export default function CustomerIndex({ customers, filters }: Props) {
                         <ExcelTransferActions
                             exportUrl={exportCustomers.url()}
                             templateUrl={customerTemplate.url()}
-                            importUrl={importCustomers.url()}
+                            importUrl={importCreate.url('customers')}
                         />
                         <button
                             type="button"

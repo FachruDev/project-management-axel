@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\HolidayExcelController;
+use App\Http\Controllers\ImportPreviewController;
 use App\Http\Controllers\IncentiveProfileController;
 use App\Http\Controllers\ProjectApprovalController;
 use App\Http\Controllers\ProjectBulkDeleteController;
@@ -35,8 +36,9 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::get('import-templates/customers', [CustomerExcelController::class, 'template'])
         ->middleware('can:import_customers')
         ->name('import-templates.customers');
-    Route::post('imports/customers', [CustomerExcelController::class, 'import'])
+    Route::post('imports/customers', [ImportPreviewController::class, 'preview'])
         ->middleware('can:import_customers')
+        ->defaults('domain', 'customers')
         ->name('imports.customers');
 
     Route::get('exports/users', [UserExcelController::class, 'export'])
@@ -45,8 +47,9 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::get('import-templates/users', [UserExcelController::class, 'template'])
         ->middleware('can:import_users')
         ->name('import-templates.users');
-    Route::post('imports/users', [UserExcelController::class, 'import'])
+    Route::post('imports/users', [ImportPreviewController::class, 'preview'])
         ->middleware('can:import_users')
+        ->defaults('domain', 'users')
         ->name('imports.users');
 
     Route::get('exports/holidays', [HolidayExcelController::class, 'export'])
@@ -55,8 +58,9 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::get('import-templates/holidays', [HolidayExcelController::class, 'template'])
         ->middleware('can:import_holidays')
         ->name('import-templates.holidays');
-    Route::post('imports/holidays', [HolidayExcelController::class, 'import'])
+    Route::post('imports/holidays', [ImportPreviewController::class, 'preview'])
         ->middleware('can:import_holidays')
+        ->defaults('domain', 'holidays')
         ->name('imports.holidays');
 
     Route::get('exports/project-preparations', [ProjectPreparationExcelController::class, 'export'])
@@ -68,9 +72,23 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::get('import-guides/project-preparations', [ProjectPreparationExcelController::class, 'guide'])
         ->middleware('can:import_project_preparations')
         ->name('import-guides.project-preparations');
-    Route::post('imports/project-preparations', [ProjectPreparationExcelController::class, 'import'])
+    Route::post('imports/project-preparations', [ImportPreviewController::class, 'preview'])
         ->middleware('can:import_project_preparations')
+        ->defaults('domain', 'project-preparations')
         ->name('imports.project-preparations');
+
+    Route::get('imports/{domain}', [ImportPreviewController::class, 'create'])
+        ->whereIn('domain', ['customers', 'users', 'holidays', 'project-preparations'])
+        ->name('imports.create');
+    Route::post('imports/{domain}/preview', [ImportPreviewController::class, 'preview'])
+        ->whereIn('domain', ['customers', 'users', 'holidays', 'project-preparations'])
+        ->name('imports.preview');
+    Route::get('imports/{domain}/{importBatch:uuid}', [ImportPreviewController::class, 'show'])
+        ->whereIn('domain', ['customers', 'users', 'holidays', 'project-preparations'])
+        ->name('imports.show');
+    Route::post('imports/{domain}/{importBatch:uuid}/confirm', [ImportPreviewController::class, 'confirm'])
+        ->whereIn('domain', ['customers', 'users', 'holidays', 'project-preparations'])
+        ->name('imports.confirm');
 
     Route::get('project-approvals', [ProjectApprovalController::class, 'index'])
         ->middleware('can:approve_projects')

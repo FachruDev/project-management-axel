@@ -9,68 +9,43 @@ use App\Models\Customer;
 use App\Models\IncentiveProfile;
 use App\Models\TaskType;
 use App\Models\User;
-use App\Services\Pdf\SimplePdfDocument;
 use Illuminate\Support\Collection;
 
 class ProjectPreparationImportGuidePdf
 {
-    public function render(): string
+    /**
+     * @return array<int, string>
+     */
+    public function importRules(): array
     {
-        $pdf = new SimplePdfDocument;
-        $data = $this->data();
-
-        $pdf->title(
-            'Project Preparation Import Guide',
-            'Master data reference and field instructions for importing project preparation and tasks. Generated at '.now()->format('Y-m-d H:i').'.',
-        );
-
-        $pdf->heading('Import Rules');
-        $pdf->bullets([
+        return [
             'Use the latest Project Preparation Excel template. Do not rename sheets or header columns.',
             'Attachments are not imported. Upload URS/UAT/BAST/task attachments manually inside the application after import.',
             'Imported projects stay in draft/preparation status. The import does not submit projects to pending approval.',
             'Project upsert key: project_id when filled; otherwise name + project_date.',
             'Task upsert key: task_id when filled; otherwise project reference + task name.',
             'Date format recommendation: YYYY-MM-DD. Boolean fields accept 1/0, true/false, yes/no, y/n, active/inactive, aktif.',
-        ]);
+        ];
+    }
 
-        $pdf->heading('Allowed Values');
-        $pdf->bullets([
+    /**
+     * @return array<int, string>
+     */
+    public function allowedValues(): array
+    {
+        return [
             'Project status: no status column in the template. Imported or updated preparation projects remain '.ProjectStatus::Draft->value.' unless existing lifecycle rules later move them.',
             'Task status values: '.implode(', ', array_map(fn (TaskStatus $status): string => $status->value, TaskStatus::cases())).'.',
             'Access Rules permission values: view, edit, manage_tasks.',
             'Project Customers is_primary: use 1 or true for the primary customer. If several rows are primary, the first one is used.',
             'Members is_support: use 1/true/yes/y/active/aktif for support member; use 0/false/no/n/inactive or leave blank for non-support.',
-        ]);
-
-        $pdf->heading('Required Columns By Sheet');
-        $pdf->table(['Sheet', 'Required columns'], $this->requiredColumns());
-
-        $pdf->heading('Active Incentive Profiles');
-        $pdf->table(['code', 'version', 'name', 'status'], $data['profiles']);
-
-        $pdf->heading('Project Role Codes By Active Profile');
-        $pdf->table(['profile', 'role_code', 'role_name', 'is_support'], $data['project_roles']);
-
-        $pdf->heading('PIC Level Codes By Active Profile');
-        $pdf->table(['profile', 'level_code', 'level_name'], $data['pic_levels']);
-
-        $pdf->heading('Active Users');
-        $pdf->table(['email', 'name', 'department', 'roles'], $data['users']);
-
-        $pdf->heading('Active Customers');
-        $pdf->table(['email', 'name', 'company_name'], $data['customers']);
-
-        $pdf->heading('Active Task Types');
-        $pdf->table(['name', 'scope', 'project_id'], $data['task_types']);
-
-        return $pdf->output();
+        ];
     }
 
     /**
      * @return array<string, array<int, array<int, mixed>>>
      */
-    private function data(): array
+    public function data(): array
     {
         $profiles = IncentiveProfile::query()
             ->with(['projectRoleRules', 'picLevelRules'])
@@ -123,7 +98,7 @@ class ProjectPreparationImportGuidePdf
     /**
      * @return array<int, array<int, string>>
      */
-    private function requiredColumns(): array
+    public function requiredColumns(): array
     {
         return [
             ['Projects', 'name, project_date, mandays, incentive_profile_code, incentive_profile_version, pm_email, location, urs_date, urs_number, plan_start_date, plan_end_date'],

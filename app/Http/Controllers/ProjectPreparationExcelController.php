@@ -11,8 +11,10 @@ use App\Services\Excel\ProjectPreparationImportGuidePdf;
 use Illuminate\Http\RedirectResponse;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Facades\Excel;
+use Spatie\LaravelPdf\Facades\Pdf;
+use Spatie\LaravelPdf\PdfBuilder;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class ProjectPreparationExcelController extends Controller
 {
@@ -71,15 +73,30 @@ class ProjectPreparationExcelController extends Controller
         );
     }
 
-    public function guide(ProjectPreparationImportGuidePdf $guide): Response|RedirectResponse
+    public function guide(ProjectPreparationImportGuidePdf $guide): PdfBuilder|RedirectResponse
     {
-        return $this->downloadFile(
-            'Project preparation guide download failed',
-            fn (): Response => response($guide->render(), 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="project-preparation-import-guide.pdf"',
-            ]),
-        );
+        try {
+            return Pdf::view('pdfs.project-preparation-import-guide', [
+                'generatedAt' => now()->format('Y-m-d H:i'),
+                'importRules' => $guide->importRules(),
+                'allowedValues' => $guide->allowedValues(),
+                'requiredColumns' => $guide->requiredColumns(),
+                'data' => $guide->data(),
+            ])
+                ->driver('dompdf')
+                ->landscape()
+                ->margins(8, 8, 8, 8)
+                ->download('project-preparation-import-guide.pdf');
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()
+                ->with('excel_error_title', 'Project preparation guide download failed')
+                ->with('excel_errors', [
+                    'The PDF guide could not be generated. Please try again after refreshing the page.',
+                    'Technical detail: '.$exception->getMessage(),
+                ]);
+        }
     }
 
     public function import(ImportExcelRequest $request, ProjectPreparationExcelService $service): RedirectResponse

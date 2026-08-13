@@ -9,9 +9,9 @@ import {
 } from '@/actions/App/Http/Controllers/HolidayController';
 import {
     exportMethod as exportHolidays,
-    importMethod as importHolidays,
     template as holidayTemplate,
 } from '@/actions/App/Http/Controllers/HolidayExcelController';
+import { create as importCreate } from '@/actions/App/Http/Controllers/ImportPreviewController';
 import { ExcelTransferActions } from '@/components/excel-transfer-actions';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
@@ -143,7 +143,7 @@ export default function HolidaysIndex({ holidays, filters, types }: Props) {
                         <ExcelTransferActions
                             exportUrl={exportHolidays.url()}
                             templateUrl={holidayTemplate.url()}
-                            importUrl={importHolidays.url()}
+                            importUrl={importCreate.url('holidays')}
                         />
                         <button
                             type="button"

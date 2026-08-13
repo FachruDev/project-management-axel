@@ -8,6 +8,7 @@ use App\Exports\ArraySheetExport;
 use App\Models\Customer;
 use App\Models\Department;
 use App\Models\Holiday;
+use App\Models\ImportBatch;
 use App\Models\IncentivePicLevelRule;
 use App\Models\IncentiveProfile;
 use App\Models\IncentiveProjectRoleRule;
@@ -21,6 +22,7 @@ use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Excel as ExcelWriter;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Spatie\LaravelPdf\Facades\Pdf;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -46,6 +48,10 @@ class ExcelImportExportTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('import-templates.customers'))
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->get(route('imports.create', 'customers'))
             ->assertForbidden();
 
         $this->actingAs($user)
@@ -75,8 +81,14 @@ class ExcelImportExportTest extends TestCase
             ['Fallback Customer', '', 'Fallback Company', '', '0'],
         ]), 'customers.xlsx');
 
-        $this->actingAs($user)
-            ->post(route('imports.customers'), ['file' => $file])
+        $batch = $this->previewImport($user, 'customers', route('imports.customers'), $file);
+
+        $this->assertDatabaseMissing('customers', [
+            'name' => 'Fallback Customer',
+            'company_name' => 'Fallback Company',
+        ]);
+
+        $this->confirmImport($user, 'customers', $batch)
             ->assertRedirect()
             ->assertSessionHas('success');
 
@@ -116,8 +128,11 @@ class ExcelImportExportTest extends TestCase
             ['New Support', 'new@example.test', 'EXT-2', 'ENG', 'support', 'secret-password', 1],
         ]), 'users.xlsx');
 
-        $this->actingAs($actor)
-            ->post(route('imports.users'), ['file' => $file])
+        $batch = $this->previewImport($actor, 'users', route('imports.users'), $file);
+
+        $this->assertDatabaseMissing('users', ['email' => 'new@example.test']);
+
+        $this->confirmImport($actor, 'users', $batch)
             ->assertRedirect()
             ->assertSessionHas('success');
 
@@ -145,11 +160,11 @@ class ExcelImportExportTest extends TestCase
             ['No Password', 'nopassword@example.test', '', '', '', '', 1],
         ]), 'users.xlsx');
 
-        $this->actingAs($actor)
-            ->post(route('imports.users'), ['file' => $file])
-            ->assertRedirect()
-            ->assertSessionHas('excel_error_title', 'User import failed')
-            ->assertSessionHas('excel_errors');
+        $batch = $this->previewImport($actor, 'users', route('imports.users'), $file);
+
+        $this->assertSame('preview', $batch->status);
+        $this->assertGreaterThan(0, $batch->summary['errors']);
+        $this->assertNotEmpty($batch->error_payload);
 
         $this->assertDatabaseMissing('users', ['email' => 'nopassword@example.test']);
     }
@@ -161,14 +176,13 @@ class ExcelImportExportTest extends TestCase
             ['Missing Columns'],
         ]), 'customers.xlsx');
 
-        $this->actingAs($actor)
-            ->post(route('imports.customers'), ['file' => $file])
-            ->assertRedirect()
-            ->assertSessionHas('excel_error_title', 'Customer import failed')
-            ->assertSessionHas('excel_errors', function (array $errors): bool {
-                return str_contains($errors[0] ?? '', 'missing required columns')
-                    && str_contains($errors[0] ?? '', 'Download the latest template');
-            });
+        $batch = $this->previewImport($actor, 'customers', route('imports.customers'), $file);
+
+        $this->assertSame('preview', $batch->status);
+        $this->assertTrue(
+            collect($batch->error_payload)->contains(fn (string $error): bool => str_contains($error, 'missing required columns')
+                && str_contains($error, 'Download the latest template')),
+        );
     }
 
     public function test_holiday_import_upserts_by_date_without_duplicate_records(): void
@@ -190,8 +204,9 @@ class ExcelImportExportTest extends TestCase
             ['2026-08-17', 'Independence Day', 'national', '0', 'Updated', 1],
         ]), 'holidays.xlsx');
 
-        $this->actingAs($actor)
-            ->post(route('imports.holidays'), ['file' => $file])
+        $batch = $this->previewImport($actor, 'holidays', route('imports.holidays'), $file);
+
+        $this->confirmImport($actor, 'holidays', $batch)
             ->assertRedirect()
             ->assertSessionHas('success');
 
@@ -254,8 +269,11 @@ class ExcelImportExportTest extends TestCase
             }
         }, 'project-preparations.xlsx');
 
-        $this->actingAs($actor)
-            ->post(route('imports.project-preparations'), ['file' => $file])
+        $batch = $this->previewImport($actor, 'project-preparations', route('imports.project-preparations'), $file);
+
+        $this->assertDatabaseMissing('projects', ['name' => 'Imported Project']);
+
+        $this->confirmImport($actor, 'project-preparations', $batch)
             ->assertRedirect()
             ->assertSessionHas('success');
 
@@ -312,13 +330,43 @@ class ExcelImportExportTest extends TestCase
             }
         }, 'project-preparations.xlsx');
 
-        $this->actingAs($actor)
-            ->post(route('imports.project-preparations'), ['file' => $file])
-            ->assertRedirect()
-            ->assertSessionHas('excel_error_title', 'Project preparation import failed')
-            ->assertSessionHas('excel_errors');
+        $batch = $this->previewImport($actor, 'project-preparations', route('imports.project-preparations'), $file);
+
+        $this->assertSame('preview', $batch->status);
+        $this->assertGreaterThan(0, $batch->summary['errors']);
+        $this->assertNotEmpty($batch->error_payload);
 
         $this->assertDatabaseMissing('projects', ['name' => 'Rollback Project']);
+    }
+
+    public function test_confirm_revalidates_file_before_database_write(): void
+    {
+        $actor = $this->userWithPermissions(['import_users']);
+        $role = Role::firstOrCreate(['name' => 'temporary-role', 'guard_name' => 'web']);
+        $file = $this->uploadedWorkbook(new ArraySheetExport('Users', [
+            'name',
+            'email',
+            'external_id',
+            'department_code',
+            'roles',
+            'password',
+            'is_active',
+        ], [
+            ['Revalidate User', 'revalidate@example.test', '', '', 'temporary-role', 'secret-password', 1],
+        ]), 'users.xlsx');
+
+        $batch = $this->previewImport($actor, 'users', route('imports.users'), $file);
+        $role->delete();
+
+        $this->confirmImport($actor, 'users', $batch)
+            ->assertRedirect()
+            ->assertSessionHas('excel_error_title', 'Import confirmation blocked')
+            ->assertSessionHas('excel_errors');
+
+        $batch->refresh();
+
+        $this->assertSame('preview', $batch->status);
+        $this->assertDatabaseMissing('users', ['email' => 'revalidate@example.test']);
     }
 
     public function test_exports_and_templates_download_xlsx_without_password_value(): void
@@ -387,6 +435,7 @@ class ExcelImportExportTest extends TestCase
     public function test_project_preparation_import_guide_pdf_contains_master_data_and_instructions(): void
     {
         $user = $this->userWithPermissions(['import_project_preparations']);
+        $pdf = Pdf::fake();
         $profile = IncentiveProfile::factory()->create([
             'code' => 'GUIDE',
             'version' => 2,
@@ -422,21 +471,18 @@ class ExcelImportExportTest extends TestCase
         $response = $this->actingAs($user)->get(route('import-guides.project-preparations'));
 
         $response->assertOk();
-        $response->assertHeader('content-type', 'application/pdf');
-        $response->assertHeader('content-disposition', 'attachment; filename="project-preparation-import-guide.pdf"');
-
-        $content = $response->getContent();
-
-        $this->assertStringStartsWith('%PDF-1.4', $content);
-        $this->assertStringContainsString('Project Preparation Import Guide', $content);
-        $this->assertStringContainsString('GUIDE', $content);
-        $this->assertStringContainsString('QA', $content);
-        $this->assertStringContainsString('SENIOR', $content);
-        $this->assertStringContainsString('guide-user@example.test', $content);
-        $this->assertStringContainsString('guide-customer@example.test', $content);
-        $this->assertStringContainsString('Guide Task Type', $content);
-        $this->assertStringContainsString('Task status values: todo, assigned, inprogress, done, cancelled', $content);
-        $this->assertStringContainsString('Members is_support: use 1/true/yes/y/active/aktif', $content);
+        $pdf->assertRespondedWithPdf(function ($builder): bool {
+            return $builder->viewName === 'pdfs.project-preparation-import-guide'
+                && $builder->downloadName === 'project-preparation-import-guide.pdf'
+                && $builder->orientation === 'Landscape'
+                && collect($builder->viewData['data']['profiles'])->flatten()->contains('GUIDE')
+                && collect($builder->viewData['data']['project_roles'])->flatten()->contains('QA')
+                && collect($builder->viewData['data']['pic_levels'])->flatten()->contains('SENIOR')
+                && collect($builder->viewData['data']['users'])->flatten()->contains('guide-user@example.test')
+                && collect($builder->viewData['data']['customers'])->flatten()->contains('guide-customer@example.test')
+                && collect($builder->viewData['data']['task_types'])->flatten()->contains('Guide Task Type')
+                && collect($builder->viewData['allowedValues'])->contains(fn (string $value): bool => str_contains($value, 'Members is_support: use 1/true/yes/y/active/aktif'));
+        });
     }
 
     /**
@@ -467,6 +513,26 @@ class ExcelImportExportTest extends TestCase
             null,
             true,
         );
+    }
+
+    private function previewImport(User $actor, string $domain, string $url, UploadedFile $file): ImportBatch
+    {
+        $this->actingAs($actor)
+            ->post($url, ['file' => $file])
+            ->assertRedirect();
+
+        $batch = ImportBatch::query()->latest('id')->firstOrFail();
+
+        $this->assertSame($domain, $batch->domain);
+        $this->assertSame('preview', $batch->status);
+
+        return $batch;
+    }
+
+    private function confirmImport(User $actor, string $domain, ImportBatch $batch)
+    {
+        return $this->actingAs($actor)
+            ->post(route('imports.confirm', [$domain, $batch]));
     }
 
     /**

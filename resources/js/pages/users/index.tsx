@@ -9,9 +9,9 @@ import {
 } from '@/actions/App/Http/Controllers/UserController';
 import {
     exportMethod as exportUsers,
-    importMethod as importUsers,
     template as userTemplate,
 } from '@/actions/App/Http/Controllers/UserExcelController';
+import { create as importCreate } from '@/actions/App/Http/Controllers/ImportPreviewController';
 import { ExcelTransferActions } from '@/components/excel-transfer-actions';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
@@ -163,7 +163,7 @@ export default function UserIndex({ users, filters, departments, roles }: Props)
                         <ExcelTransferActions
                             exportUrl={exportUsers.url()}
                             templateUrl={userTemplate.url()}
-                            importUrl={importUsers.url()}
+                            importUrl={importCreate.url('users')}
                         />
                         <button
                             type="button"
