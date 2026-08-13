@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\AttachmentCollection;
 use App\Enums\TaskStatus;
 use App\Events\ProjectBoardChanged;
 use App\Events\TaskBoardChanged;
 use App\Http\Requests\StoreBulkProjectTasksRequest;
+use App\Models\Attachment;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\ProjectTask;
@@ -13,6 +15,7 @@ use App\Models\TaskType;
 use App\Models\User;
 use App\Services\Projects\ProjectAuditLogger;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -92,6 +95,8 @@ class ProjectBulkTaskController extends Controller
                     null,
                     'bulk_create',
                 );
+
+                $this->storeTaskFiles($projectTask, $task['attachments'] ?? [], $actor);
             }
 
             TaskBoardChanged::dispatch([
@@ -112,6 +117,51 @@ class ProjectBulkTaskController extends Controller
         return redirect()
             ->route('projects.preparation.show', $project)
             ->with('success', 'Tasks added.');
+    }
+
+    /**
+     * @param  array<int, mixed>  $files
+     */
+    private function storeTaskFiles(ProjectTask $task, array $files, User $actor): void
+    {
+        foreach ($files as $file) {
+            if (! $file instanceof UploadedFile) {
+                continue;
+            }
+
+            $path = $file->store('project-task-attachments');
+
+            if ($path === false) {
+                throw ValidationException::withMessages([
+                    'tasks' => ['Task attachment could not be stored.'],
+                ]);
+            }
+
+            $attachment = Attachment::create([
+                'attachable_type' => $task->getMorphClass(),
+                'attachable_id' => $task->id,
+                'collection' => AttachmentCollection::TaskAttachment,
+                'disk' => config('filesystems.default', 'local'),
+                'path' => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getClientMimeType(),
+                'size' => $file->getSize(),
+                'uploaded_by' => $actor->id,
+            ]);
+
+            $task->loadMissing('project');
+
+            $this->auditLogger->log(
+                $task->project,
+                $actor,
+                'attachment_uploaded',
+                $attachment,
+                null,
+                $this->attachmentSnapshot($attachment),
+                null,
+                'bulk_create',
+            );
+        }
     }
 
     private function validatedTaskTypeId(Project $project, mixed $taskTypeId): ?int
@@ -162,6 +212,24 @@ class ProjectBulkTaskController extends Controller
             'plan_end_date',
             'actual_start_date',
             'actual_end_date',
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function attachmentSnapshot(Attachment $attachment): array
+    {
+        return $this->auditLogger->snapshot($attachment, [
+            'attachable_type',
+            'attachable_id',
+            'collection',
+            'disk',
+            'path',
+            'original_name',
+            'mime_type',
+            'size',
+            'uploaded_by',
         ]);
     }
 }

@@ -25,6 +25,8 @@ class StoreBulkProjectTasksRequest extends FormRequest
             'tasks.*.description' => ['nullable', 'string', 'max:2000'],
             'tasks.*.plan_start_date' => ['required', 'date'],
             'tasks.*.plan_end_date' => ['required', 'date'],
+            'tasks.*.attachments' => ['nullable', 'array'],
+            'tasks.*.attachments.*' => ['file', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'max:10240'],
         ];
     }
 }

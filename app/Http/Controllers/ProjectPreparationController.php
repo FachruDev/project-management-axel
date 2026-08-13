@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Enums\AttachmentCollection;
+use App\Enums\IncentiveProfileStatus;
 use App\Enums\TaskStatus;
 use App\Http\Requests\UpdateProjectPreparationRequest;
 use App\Models\Attachment;
+use App\Models\Customer;
 use App\Models\IncentivePicLevelRule;
+use App\Models\IncentiveProfile;
 use App\Models\IncentiveProjectRoleRule;
 use App\Models\Project;
 use App\Models\ProjectTask;
@@ -91,6 +94,7 @@ class ProjectPreparationController extends Controller
                 'name' => $customer->name,
                 'email' => $customer->email,
                 'company_name' => $customer->company_name,
+                'is_primary' => (bool) $customer->getRelationValue('pivot')?->getAttribute('is_primary'),
             ])->values()->all(),
             'members' => $project->members->map(fn ($member): array => [
                 'id' => $member->id,
@@ -141,6 +145,20 @@ class ProjectPreparationController extends Controller
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name', 'email', 'external_id']),
+            'customers' => Customer::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'company_name']),
+            'incentive_profiles' => IncentiveProfile::query()
+                ->where(function ($query) use ($project): void {
+                    $query->where('status', IncentiveProfileStatus::Active->value);
+
+                    if ($project->incentive_profile_id !== null) {
+                        $query->orWhere((new IncentiveProfile)->getKeyName(), $project->incentive_profile_id);
+                    }
+                })
+                ->orderBy('code')
+                ->get(['id', 'code', 'name', 'version']),
             'task_types' => TaskType::query()
                 ->where('is_active', true)
                 ->where(function ($query) use ($project): void {

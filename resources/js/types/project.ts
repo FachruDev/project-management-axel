@@ -220,6 +220,8 @@ export type ProjectPreparationProps = {
     project: PreparationProject;
     options: {
         users: UserOption[];
+        customers: CustomerProjectOption[];
+        incentive_profiles: IncentiveProfileOption[];
         task_types: ProjectTaskTypeOption[];
         task_statuses: Array<{ value: ProjectTaskStatus; label: string }>;
         project_role_rules: Array<{

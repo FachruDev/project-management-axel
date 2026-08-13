@@ -80,6 +80,10 @@ class ProjectWriteService
             $oldData = $this->projectPreparationSnapshot($project);
 
             $project->update([
+                'name' => $data['name'],
+                'project_date' => $data['project_date'],
+                'mandays' => $data['mandays'],
+                'incentive_profile_id' => $data['incentive_profile_id'],
                 'pm_user_id' => $data['pm_user_id'],
                 'request_user_id' => $data['request_user_id'] ?? null,
                 'location' => $data['location'],
@@ -92,6 +96,7 @@ class ProjectWriteService
                 'updated_by' => $actor->id,
             ]);
 
+            $this->syncCustomers($project, $data);
             $this->syncMembers($project, Arr::wrap($data['members'] ?? []), $actor);
             $this->syncAccessRules($project, Arr::wrap($data['access_rules'] ?? []), $actor);
             $this->syncTasks($project, Arr::wrap($data['tasks'] ?? []), $actor);
@@ -489,7 +494,11 @@ class ProjectWriteService
     private function projectPreparationSnapshot(Project $project): array
     {
         return $this->auditLogger->snapshot($project, [
+            'name',
+            'project_date',
             'status',
+            'mandays',
+            'incentive_profile_id',
             'pm_user_id',
             'request_user_id',
             'location',

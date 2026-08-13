@@ -115,6 +115,14 @@ class ProjectPageWorkflowTest extends TestCase
         $project = Project::query()->where('name', 'Preparation Draft')->firstOrFail();
 
         $response->assertRedirect(route('projects.preparation.show', $project));
+
+        $this->actingAs($user)
+            ->get(route('projects.preparation.show', $project))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('projects/preparation')
+                ->where('project.id', $project->id)
+                ->has('options.incentive_profiles', 1));
     }
 
     public function test_draft_project_can_be_created_from_project_payload(): void
@@ -148,6 +156,7 @@ class ProjectPageWorkflowTest extends TestCase
 
         $user = $this->userWithPermissions(['manage_projects']);
         $profile = $this->profileWithRules();
+        $customer = Customer::factory()->create();
         $project = Project::factory()->create([
             'incentive_profile_id' => $profile->id,
         ]);
@@ -160,6 +169,12 @@ class ProjectPageWorkflowTest extends TestCase
         $this->actingAs($user)
             ->post(route('projects.preparation.update', $project), [
                 '_method' => 'PUT',
+                'name' => 'Updated Preparation Project',
+                'project_date' => '2026-08-11',
+                'customer_ids' => [$customer->id],
+                'primary_customer_id' => $customer->id,
+                'mandays' => 9.5,
+                'incentive_profile_id' => $profile->id,
                 'pm_user_id' => $pm->id,
                 'request_user_id' => $user->id,
                 'location' => 'Jakarta',
@@ -199,6 +214,9 @@ class ProjectPageWorkflowTest extends TestCase
         $project->refresh();
 
         $this->assertSame($pm->id, $project->pm_user_id);
+        $this->assertSame('Updated Preparation Project', $project->name);
+        $this->assertSame('9.50', $project->mandays);
+        $this->assertTrue($project->customers()->whereKey($customer->id)->exists());
         $this->assertTrue($project->hasAttachment(AttachmentCollection::UrsFile));
         $this->assertTrue($project->members()->where('user_id', $memberUser->id)->exists());
         $this->assertTrue($project->accessRules()->where('permission', 'manage_tasks')->exists());
@@ -481,6 +499,8 @@ class ProjectPageWorkflowTest extends TestCase
 
     public function test_bulk_task_create_page_and_store_create_multiple_tasks(): void
     {
+        Storage::fake('local');
+
         $user = $this->userWithPermissions(['manage_tasks']);
         $project = $this->preparedProject($user);
         $taskType = TaskType::factory()->create(['project_id' => $project->id]);
@@ -503,6 +523,9 @@ class ProjectPageWorkflowTest extends TestCase
                         'description' => 'First bulk task',
                         'plan_start_date' => '2026-08-14',
                         'plan_end_date' => '2026-08-15',
+                        'attachments' => [
+                            UploadedFile::fake()->create('bulk-task.pdf', 12, 'application/pdf'),
+                        ],
                     ],
                     [
                         'name' => 'Bulk Task 2',
@@ -526,6 +549,10 @@ class ProjectPageWorkflowTest extends TestCase
             'project_id' => $project->id,
             'name' => 'Bulk Task 2',
             'status' => TaskStatus::Todo->value,
+        ]);
+        $this->assertDatabaseHas('attachments', [
+            'collection' => AttachmentCollection::TaskAttachment->value,
+            'original_name' => 'bulk-task.pdf',
         ]);
     }
 

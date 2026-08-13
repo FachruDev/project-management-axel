@@ -1,5 +1,24 @@
 import { Link, router, usePage } from '@inertiajs/react';
+import {
+    ArrowLeft,
+    Calendar,
+    CheckCircle2,
+    FileText,
+    Paperclip,
+    RefreshCw,
+    Send,
+    Play,
+    XCircle,
+    User,
+    MapPin,
+    Hash,
+    Clock,
+    History,
+    FileCode,
+    Sparkles
+} from 'lucide-react';
 import type { ReactNode } from 'react';
+
 import {
     close,
     index,
@@ -19,16 +38,17 @@ type Props = {
 };
 
 const taskTone: Record<ProjectTaskStatus, string> = {
-    todo: 'bg-pastel-slate text-slate-700',
-    assigned: 'bg-pastel-blue text-primary',
-    inprogress: 'bg-pastel-amber text-amber-800',
-    done: 'bg-pastel-green text-emerald-700',
-    cancelled: 'bg-pastel-red text-red-700',
+    todo: 'bg-slate-100 text-slate-700 border-slate-200',
+    assigned: 'bg-sky-50 text-sky-700 border-sky-200',
+    inprogress: 'bg-amber-50 text-amber-800 border-amber-200',
+    done: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    cancelled: 'bg-red-50 text-red-700 border-red-200',
 };
 
 export default function ProjectShow({ project }: Props) {
     const flash = usePage().props.flash as { success?: string | null } | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
+
     const doneTasks = project.tasks.filter((task) => task.status === 'done').length;
     const progress =
         project.tasks.length > 0
@@ -41,304 +61,379 @@ export default function ProjectShow({ project }: Props) {
 
     return (
         <AppLayout title={project.name}>
-            <PageHeader
-                eyebrow="Project Detail"
-                title={project.name}
-                description={`${project.customers.map((customer) => customer.name).join(', ') || 'No customer'} / ${project.mandays} mandays`}
-                actions={
-                    <>
-                        <Link
-                            href={index.url()}
-                            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
-                        >
-                            Back
-                        </Link>
-                        {project.actions.can_prepare && (
+            <div className="space-y-6">
+
+                {/* Header Action Bar */}
+                <PageHeader
+                    eyebrow="Project Overview"
+                    title={project.name}
+                    description={`${project.customers.map((c) => c.name).join(', ') || 'No Customer'} • ${project.mandays} Mandays`}
+                    actions={
+                        <div className="flex flex-wrap items-center gap-2">
                             <Link
-                                href={preparationShow.url(project.id)}
-                                className="rounded-md border border-primary/30 px-4 py-2 text-sm font-medium text-primary hover:bg-pastel-blue"
+                                href={index.url()}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition-all"
                             >
-                                Preparation
+                                <ArrowLeft className="h-3.5 w-3.5" />
+                                <span>Back</span>
                             </Link>
-                        )}
-                        {project.actions.can_submit && (
-                            <ActionButton
-                                onClick={() => postAction(submitApproval.url(project.id))}
-                            >
-                                Submit Approval
-                            </ActionButton>
-                        )}
-                        {project.actions.can_resubmit && (
-                            <ActionButton
-                                onClick={() => postAction(resubmit.url(project.id))}
-                            >
-                                Resubmit
-                            </ActionButton>
-                        )}
-                        {project.actions.can_start && (
-                            <ActionButton onClick={() => postAction(start.url(project.id))}>
-                                Start
-                            </ActionButton>
-                        )}
-                        {project.actions.can_refresh && (
-                            <button
-                                type="button"
-                                onClick={() => postAction(refreshStatus.url(project.id))}
-                                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
-                            >
-                                Refresh Status
-                            </button>
-                        )}
-                        {project.actions.can_close && (
-                            <ActionButton onClick={() => postAction(close.url(project.id))}>
-                                Close
-                            </ActionButton>
-                        )}
-                    </>
-                }
-            />
 
-            {flash?.success && <Alert tone="success">{flash.success}</Alert>}
-            {errors?.project && <Alert tone="danger">{errors.project}</Alert>}
+                            {project.actions.can_prepare && (
+                                <Link
+                                    href={preparationShow.url(project.id)}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3.5 py-2 text-xs font-semibold text-primary shadow-xs hover:bg-primary/10 transition-all"
+                                >
+                                    <FileCode className="h-3.5 w-3.5" />
+                                    <span>Preparation</span>
+                                </Link>
+                            )}
 
-            <section className="grid gap-4 lg:grid-cols-[1fr_360px]">
-                <div className="space-y-4">
-                    <div className="rounded-lg border border-slate-200 bg-white p-5">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <p className="text-sm text-slate-500">Status</p>
-                                <div className="mt-2">
-                                    <ProjectStatusBadge status={project.status} />
-                                </div>
+                            {project.actions.can_submit && (
+                                <ActionButton icon={Send} onClick={() => postAction(submitApproval.url(project.id))}>
+                                    Submit Approval
+                                </ActionButton>
+                            )}
+
+                            {project.actions.can_resubmit && (
+                                <ActionButton icon={Send} onClick={() => postAction(resubmit.url(project.id))}>
+                                    Resubmit
+                                </ActionButton>
+                            )}
+
+                            {project.actions.can_start && (
+                                <ActionButton icon={Play} onClick={() => postAction(start.url(project.id))}>
+                                    Start Project
+                                </ActionButton>
+                            )}
+
+                            {project.actions.can_refresh && (
+                                <button
+                                    type="button"
+                                    onClick={() => postAction(refreshStatus.url(project.id))}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition-all"
+                                >
+                                    <RefreshCw className="h-3.5 w-3.5 text-slate-400" />
+                                    <span>Refresh Status</span>
+                                </button>
+                            )}
+
+                            {project.actions.can_close && (
+                                <ActionButton icon={CheckCircle2} onClick={() => postAction(close.url(project.id))}>
+                                    Close Project
+                                </ActionButton>
+                            )}
+                        </div>
+                    }
+                />
+
+                {/* Alerts */}
+                {flash?.success && <Alert tone="success">{flash.success}</Alert>}
+                {errors?.project && <Alert tone="danger">{errors.project}</Alert>}
+
+                {/* Status & Progress Summary Hero Card */}
+                <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-r from-white via-slate-50/50 to-indigo-50/30 p-6 shadow-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-6">
+                        <div className="space-y-2">
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Current Status</span>
+                            <div className="flex items-center gap-3">
+                                <ProjectStatusBadge status={project.status} />
+                                <span className="text-xs text-slate-400">•</span>
+                                <span className="text-xs font-semibold text-slate-600">
+                                    {project.tasks.length} Total Tasks ({doneTasks} Completed)
+                                </span>
                             </div>
-                            <div className="min-w-48">
-                                <div className="flex justify-between text-sm text-slate-600">
-                                    <span>Task Progress</span>
-                                    <span>{progress}%</span>
-                                </div>
-                                <div className="mt-2 h-2 rounded-full bg-slate-100">
-                                    <div
-                                        className="h-2 rounded-full bg-primary"
-                                        style={{ width: `${progress}%` }}
-                                    />
-                                </div>
+                        </div>
+
+                        {/* Progress Bar Container */}
+                        <div className="w-full sm:w-72 space-y-2">
+                            <div className="flex justify-between text-xs font-bold">
+                                <span className="text-slate-700">Project Completion</span>
+                                <span className="text-primary">{progress}%</span>
+                            </div>
+                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200/60 p-0.5">
+                                <div
+                                    className="h-full rounded-full bg-primary transition-all duration-500 ease-out shadow-xs shadow-primary/30"
+                                    style={{ width: `${progress}%` }}
+                                />
                             </div>
                         </div>
                     </div>
-
-                    <Panel title="Project Dates">
-                        <InfoGrid>
-                            <Info label="Project Date" value={project.project_date} />
-                            <Info label="Plan Start" value={project.plan_start_date} />
-                            <Info label="Plan End" value={project.plan_end_date} />
-                            <Info label="Actual Start" value={project.actual_start_date} />
-                            <Info label="Actual End" value={project.actual_end_date} />
-                            <Info label="UAT Date" value={project.uat_date} />
-                            <Info label="BAST Date" value={project.bast_date} />
-                            <Info label="URS Date" value={project.urs_date} />
-                        </InfoGrid>
-                    </Panel>
-
-                    <Panel title="Tasks">
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                <thead className="text-left text-xs font-semibold uppercase text-slate-500">
-                                    <tr>
-                                        <th className="px-3 py-2">Task</th>
-                                        <th className="px-3 py-2">PIC</th>
-                                        <th className="px-3 py-2">Plan</th>
-                                        <th className="px-3 py-2">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {project.tasks.map((task) => (
-                                        <tr key={task.id}>
-                                            <td className="px-3 py-3 font-medium text-slate-900">
-                                                {task.name}
-                                            </td>
-                                            <td className="px-3 py-3 text-slate-600">
-                                                {task.pic?.name ?? '-'}
-                                            </td>
-                                            <td className="px-3 py-3 text-slate-600">
-                                                {task.plan_start_date ?? '-'} /{' '}
-                                                {task.plan_end_date ?? '-'}
-                                            </td>
-                                            <td className="px-3 py-3">
-                                                <span
-                                                    className={`rounded-full px-2 py-1 text-xs font-medium ${taskTone[task.status]}`}
-                                                >
-                                                    {task.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {project.tasks.length === 0 && (
-                                        <tr>
-                                            <td
-                                                colSpan={4}
-                                                className="px-3 py-10 text-center text-slate-500"
-                                            >
-                                                No tasks yet.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Panel>
-
-                    <Panel title="Audit Log">
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-slate-200 text-sm">
-                                <thead className="text-left text-xs font-semibold uppercase text-slate-500">
-                                    <tr>
-                                        <th className="px-3 py-2">Date</th>
-                                        <th className="px-3 py-2">Actor</th>
-                                        <th className="px-3 py-2">Action</th>
-                                        <th className="px-3 py-2">Entity</th>
-                                        <th className="px-3 py-2">Changes</th>
-                                        <th className="px-3 py-2">Reason</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {project.audit_logs.map((log) => (
-                                        <tr key={log.id} className="align-top">
-                                            <td className="whitespace-nowrap px-3 py-3 text-slate-600">
-                                                {formatDateTime(log.changed_at)}
-                                            </td>
-                                            <td className="px-3 py-3 text-slate-700">
-                                                {log.actor?.name ?? 'System'}
-                                            </td>
-                                            <td className="px-3 py-3">
-                                                <div className="font-medium text-slate-900">
-                                                    {log.action.replaceAll('_', ' ')}
-                                                </div>
-                                                <div className="mt-1 text-xs text-slate-500">
-                                                    {log.source ?? 'manual'}
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-3 text-slate-600">
-                                                {log.entity_type ?? '-'}
-                                                {log.entity_id ? ` #${log.entity_id}` : ''}
-                                            </td>
-                                            <td className="max-w-[320px] px-3 py-3 text-xs text-slate-600">
-                                                <ChangeSummary oldData={log.old} newData={log.new} />
-                                            </td>
-                                            <td className="max-w-[220px] px-3 py-3 text-slate-600">
-                                                {log.reason ?? '-'}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {project.audit_logs.length === 0 && (
-                                        <tr>
-                                            <td
-                                                colSpan={6}
-                                                className="px-3 py-10 text-center text-slate-500"
-                                            >
-                                                No audit log yet.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Panel>
                 </div>
 
-                <aside className="space-y-4">
-                    <Panel title="Preparation Summary">
-                        <InfoGrid>
-                            <Info label="PM" value={project.pm?.name} />
-                            <Info label="Requester" value={project.requester?.name} />
-                            <Info label="Location" value={project.location} />
-                            <Info label="URS Number" value={project.urs_number} />
-                            <Info
-                                label="Incentive Profile"
-                                value={
-                                    project.incentive_profile
-                                        ? `${project.incentive_profile.code} v${project.incentive_profile.version}`
-                                        : null
-                                }
-                            />
-                        </InfoGrid>
-                    </Panel>
+                {/* Main Content Grid */}
+                <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
 
-                    {project.rejection_notes && (
-                        <div className="rounded-lg border border-red-200 bg-pastel-red p-4 text-sm text-red-800">
-                            <div className="font-semibold">Reject Notes</div>
-                            <p className="mt-1">{project.rejection_notes}</p>
-                        </div>
-                    )}
+                    {/* Left Column (Dates, Tasks, Audit) */}
+                    <div className="space-y-6">
 
-                    <Panel title="Members">
-                        <div className="space-y-3">
-                            {project.members.map((member) => (
-                                <div
-                                    key={member.id}
-                                    className="rounded-md border border-slate-200 p-3"
-                                >
-                                    <div className="font-medium text-slate-900">
-                                        {member.user?.name ?? '-'}
+                        {/* Project Dates Section */}
+                        <Panel title="Project Timeline & Dates" icon={Calendar}>
+                            <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+                                <DateCard label="Project Date" value={project.project_date} />
+                                <DateCard label="Plan Start" value={project.plan_start_date} />
+                                <DateCard label="Plan End" value={project.plan_end_date} />
+                                <DateCard label="Actual Start" value={project.actual_start_date} />
+                                <DateCard label="Actual End" value={project.actual_end_date} />
+                                <DateCard label="UAT Date" value={project.uat_date} />
+                                <DateCard label="BAST Date" value={project.bast_date} />
+                                <DateCard label="URS Date" value={project.urs_date} />
+                            </div>
+                        </Panel>
+
+                        {/* Tasks Table Section */}
+                        <Panel title={`Project Tasks (${project.tasks.length})`} icon={CheckCircle2}>
+                            <div className="overflow-x-auto rounded-xl border border-slate-100">
+                                <table className="min-w-full divide-y divide-slate-100 text-left text-xs">
+                                    <thead className="bg-slate-50/80 font-bold uppercase tracking-wider text-slate-400">
+                                        <tr>
+                                            <th className="px-4 py-3">Task Name</th>
+                                            <th className="px-4 py-3">PIC</th>
+                                            <th className="px-4 py-3">Plan Schedule</th>
+                                            <th className="px-4 py-3">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 font-medium">
+                                        {project.tasks.map((task) => (
+                                            <tr key={task.id} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-4 py-3 font-semibold text-slate-900">
+                                                    {task.name}
+                                                </td>
+                                                <td className="px-4 py-3 text-slate-600">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">
+                                                            {(task.pic?.name ?? '-').charAt(0)}
+                                                        </div>
+                                                        <span>{task.pic?.name ?? '-'}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-slate-500">
+                                                    {task.plan_start_date ?? '-'} &rarr; {task.plan_end_date ?? '-'}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${taskTone[task.status]}`}>
+                                                        {task.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {project.tasks.length === 0 && (
+                                            <tr>
+                                                <td colSpan={4} className="px-4 py-8 text-center text-slate-400 font-normal">
+                                                    No tasks registered for this project.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Panel>
+
+                        {/* Audit Log Timeline Section */}
+                        <Panel title="Audit Trail Log" icon={History}>
+                            <div className="overflow-x-auto rounded-xl border border-slate-100">
+                                <table className="min-w-full divide-y divide-slate-100 text-left text-xs">
+                                    <thead className="bg-slate-50/80 font-bold uppercase tracking-wider text-slate-400">
+                                        <tr>
+                                            <th className="px-4 py-3">Timestamp</th>
+                                            <th className="px-4 py-3">Actor</th>
+                                            <th className="px-4 py-3">Action</th>
+                                            <th className="px-4 py-3">Changes Summary</th>
+                                            <th className="px-4 py-3">Reason</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 font-medium text-slate-600">
+                                        {project.audit_logs.map((log) => (
+                                            <tr key={log.id} className="align-top hover:bg-slate-50/50 transition-colors">
+                                                <td className="whitespace-nowrap px-4 py-3 font-mono text-[11px] text-slate-400">
+                                                    {formatDateTime(log.changed_at)}
+                                                </td>
+                                                <td className="px-4 py-3 font-semibold text-slate-800">
+                                                    {log.actor?.name ?? 'System'}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                                                        {log.action.replaceAll('_', ' ')}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-[11px]">
+                                                    <ChangeSummary oldData={log.old} newData={log.new} />
+                                                </td>
+                                                <td className="px-4 py-3 text-slate-500 italic max-w-[180px]">
+                                                    {log.reason ?? '-'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {project.audit_logs.length === 0 && (
+                                            <tr>
+                                                <td colSpan={5} className="px-4 py-8 text-center text-slate-400 font-normal">
+                                                    No audit history available yet.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Panel>
+
+                    </div>
+
+                    {/* Right Column (Preparation Details, Members, Attachments) */}
+                    <aside className="space-y-6">
+
+                        {/* Preparation Summary */}
+                        <Panel title="Preparation Specs" icon={FileText}>
+                            <div className="space-y-3">
+                                <MetaItem icon={User} label="Project Manager" value={project.pm?.name} />
+                                <MetaItem icon={User} label="Requester" value={project.requester?.name} />
+                                <MetaItem icon={MapPin} label="Location" value={project.location} />
+                                <MetaItem icon={Hash} label="URS Number" value={project.urs_number} />
+                                <MetaItem
+                                    icon={Sparkles}
+                                    label="Incentive Profile"
+                                    value={
+                                        project.incentive_profile
+                                            ? `${project.incentive_profile.code} v${project.incentive_profile.version}`
+                                            : null
+                                    }
+                                />
+                            </div>
+                        </Panel>
+
+                        {/* Rejection Notes Banner */}
+                        {project.rejection_notes && (
+                            <div className="rounded-xl border border-red-200/80 bg-red-50/70 p-4 shadow-xs">
+                                <div className="flex items-center gap-2 font-bold text-xs text-red-900 uppercase tracking-wider">
+                                    <XCircle className="h-4 w-4 text-red-600" />
+                                    <span>Rejection Reason</span>
+                                </div>
+                                <p className="mt-2 text-xs leading-relaxed text-red-700 font-medium">
+                                    {project.rejection_notes}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Project Members */}
+                        <Panel title={`Team Members (${project.members.length})`} icon={User}>
+                            <div className="space-y-2.5">
+                                {project.members.map((member) => (
+                                    <div
+                                        key={member.id}
+                                        className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 p-3"
+                                    >
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-primary">
+                                                {(member.user?.name ?? 'U').charAt(0)}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="truncate text-xs font-bold text-slate-800">
+                                                    {member.user?.name ?? '-'}
+                                                </div>
+                                                <div className="truncate text-[10px] text-slate-400">
+                                                    {member.project_role_name ?? '-'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {member.is_support && (
+                                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                                                Support
+                                            </span>
+                                        )}
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-500">
-                                        {member.project_role_name ?? '-'} /{' '}
-                                        {member.pic_level_name ?? 'No PIC level'}
-                                    </div>
-                                    {member.is_support && (
-                                        <span className="mt-2 inline-flex rounded-full bg-pastel-green px-2 py-1 text-xs font-medium text-emerald-700">
-                                            Support
+                                ))}
+
+                                {project.members.length === 0 && (
+                                    <p className="py-2 text-center text-xs text-slate-400">No team members assigned.</p>
+                                )}
+                            </div>
+                        </Panel>
+
+                        {/* Attachments Panel */}
+                        <Panel title={`Attachments (${project.attachments.length})`} icon={Paperclip}>
+                            <div className="space-y-2">
+                                {project.attachments.map((attachment) => (
+                                    <div
+                                        key={attachment.id}
+                                        className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-xs"
+                                    >
+                                        <div className="flex items-center gap-2 truncate pr-2">
+                                            <Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                            <span className="truncate font-semibold text-slate-700">
+                                                {attachment.original_name}
+                                            </span>
+                                        </div>
+                                        <span className="shrink-0 rounded bg-slate-200/60 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                                            {attachment.collection.replaceAll('_', ' ')}
                                         </span>
-                                    )}
-                                </div>
-                            ))}
-                            {project.members.length === 0 && (
-                                <p className="text-sm text-slate-500">No members.</p>
-                            )}
-                        </div>
-                    </Panel>
+                                    </div>
+                                ))}
 
-                    <Panel title="Attachments">
-                        <div className="space-y-2">
-                            {project.attachments.map((attachment) => (
-                                <div
-                                    key={attachment.id}
-                                    className="flex justify-between rounded-md bg-pastel-slate px-3 py-2 text-sm"
-                                >
-                                    <span>{attachment.original_name}</span>
-                                    <span className="text-xs text-slate-500">
-                                        {attachment.collection.replaceAll('_', ' ')}
-                                    </span>
-                                </div>
-                            ))}
-                            {project.attachments.length === 0 && (
-                                <p className="text-sm text-slate-500">No files uploaded.</p>
-                            )}
-                        </div>
-                    </Panel>
-                </aside>
-            </section>
+                                {project.attachments.length === 0 && (
+                                    <p className="py-2 text-center text-xs text-slate-400">No attachments uploaded.</p>
+                                )}
+                            </div>
+                        </Panel>
+
+                    </aside>
+                </section>
+
+            </div>
         </AppLayout>
     );
 }
 
-function Panel({ title, children }: { title: string; children: ReactNode }) {
+{/* Micro UI Components */}
+
+function Panel({
+    title,
+    icon: Icon,
+    children,
+}: {
+    title: string;
+    icon?: React.ElementType;
+    children: ReactNode;
+}) {
     return (
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
-            <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+        <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                {Icon && <Icon className="h-4 w-4 text-primary" />}
+                <h2 className="text-sm font-bold text-slate-900 tracking-tight">{title}</h2>
+            </div>
             <div className="mt-4">{children}</div>
         </section>
     );
 }
 
-function InfoGrid({ children }: { children: ReactNode }) {
-    return <dl className="grid gap-4 sm:grid-cols-2">{children}</dl>;
+function DateCard({ label, value }: { label: string; value?: string | null }) {
+    return (
+        <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3 space-y-1">
+            <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <Clock className="h-3 w-3" />
+                <span>{label}</span>
+            </div>
+            <div className="text-xs font-bold text-slate-800">
+                {value || '-'}
+            </div>
+        </div>
+    );
 }
 
-function Info({ label, value }: { label: string; value?: string | null }) {
+function MetaItem({
+    icon: Icon,
+    label,
+    value,
+}: {
+    icon: React.ElementType;
+    label: string;
+    value?: string | null;
+}) {
     return (
-        <div>
-            <dt className="text-xs font-medium uppercase text-slate-500">{label}</dt>
-            <dd className="mt-1 text-sm text-slate-900">{value || '-'}</dd>
+        <div className="flex items-center justify-between text-xs py-1 border-b border-slate-50">
+            <span className="flex items-center gap-1.5 text-slate-400 font-medium">
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+            </span>
+            <span className="font-bold text-slate-800">{value || '-'}</span>
         </div>
     );
 }
@@ -346,17 +441,20 @@ function Info({ label, value }: { label: string; value?: string | null }) {
 function ActionButton({
     children,
     onClick,
+    icon: Icon,
 }: {
     children: ReactNode;
     onClick: () => void;
+    icon?: React.ElementType;
 }) {
     return (
         <button
             type="button"
             onClick={onClick}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-primary/90 active:scale-95"
         >
-            {children}
+            {Icon && <Icon className="h-3.5 w-3.5" />}
+            <span>{children}</span>
         </button>
     );
 }
@@ -370,19 +468,19 @@ function ChangeSummary({
 }) {
     const keys = Array.from(
         new Set([...Object.keys(oldData ?? {}), ...Object.keys(newData ?? {})]),
-    ).slice(0, 6);
+    ).slice(0, 4);
 
     if (keys.length === 0) {
-        return <span>-</span>;
+        return <span className="text-slate-400">-</span>;
     }
 
     return (
         <div className="space-y-1">
             {keys.map((key) => (
-                <div key={key} className="grid grid-cols-[92px_1fr] gap-2">
-                    <span className="font-medium text-slate-500">{key}</span>
-                    <span className="break-words text-slate-700">
-                        {stringValue(oldData?.[key])} {'->'} {stringValue(newData?.[key])}
+                <div key={key} className="flex items-center gap-1.5">
+                    <span className="font-semibold text-slate-500">{key}:</span>
+                    <span className="text-slate-700">
+                        {stringValue(oldData?.[key])} &rarr; <strong className="text-slate-900">{stringValue(newData?.[key])}</strong>
                     </span>
                 </div>
             ))}
@@ -391,21 +489,15 @@ function ChangeSummary({
 }
 
 function stringValue(value: unknown) {
-    if (value === null || value === undefined || value === '') {
-        return '-';
-    }
+    if (value === null || value === undefined || value === '') return '-';
 
-    if (typeof value === 'object') {
-        return JSON.stringify(value);
-    }
+    if (typeof value === 'object') return JSON.stringify(value);
 
     return String(value);
 }
 
 function formatDateTime(value: string | null) {
-    if (! value) {
-        return '-';
-    }
+    if (!value) return '-';
 
     return value.replace('T', ' ').replace(/\.\d+Z$/, '');
 }
@@ -419,10 +511,10 @@ function Alert({
 }) {
     return (
         <div
-            className={`rounded-lg border px-4 py-3 text-sm ${
+            className={`rounded-xl border px-4 py-3 text-xs font-semibold shadow-xs ${
                 tone === 'success'
-                    ? 'border-emerald-200 bg-pastel-green text-emerald-800'
-                    : 'border-red-200 bg-pastel-red text-red-700'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-red-200 bg-red-50 text-red-700'
             }`}
         >
             {children}
