@@ -20,6 +20,7 @@ use Illuminate\Http\UploadedFile;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Excel as ExcelWriter;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -147,9 +148,27 @@ class ExcelImportExportTest extends TestCase
         $this->actingAs($actor)
             ->post(route('imports.users'), ['file' => $file])
             ->assertRedirect()
-            ->assertSessionHas('import_errors');
+            ->assertSessionHas('excel_error_title', 'User import failed')
+            ->assertSessionHas('excel_errors');
 
         $this->assertDatabaseMissing('users', ['email' => 'nopassword@example.test']);
+    }
+
+    public function test_import_reports_missing_columns_with_clear_message(): void
+    {
+        $actor = $this->userWithPermissions(['import_customers']);
+        $file = $this->uploadedWorkbook(new ArraySheetExport('Customers', ['name'], [
+            ['Missing Columns'],
+        ]), 'customers.xlsx');
+
+        $this->actingAs($actor)
+            ->post(route('imports.customers'), ['file' => $file])
+            ->assertRedirect()
+            ->assertSessionHas('excel_error_title', 'Customer import failed')
+            ->assertSessionHas('excel_errors', function (array $errors): bool {
+                return str_contains($errors[0] ?? '', 'missing required columns')
+                    && str_contains($errors[0] ?? '', 'Download the latest template');
+            });
     }
 
     public function test_holiday_import_upserts_by_date_without_duplicate_records(): void
@@ -296,7 +315,8 @@ class ExcelImportExportTest extends TestCase
         $this->actingAs($actor)
             ->post(route('imports.project-preparations'), ['file' => $file])
             ->assertRedirect()
-            ->assertSessionHas('import_errors');
+            ->assertSessionHas('excel_error_title', 'Project preparation import failed')
+            ->assertSessionHas('excel_errors');
 
         $this->assertDatabaseMissing('projects', ['name' => 'Rollback Project']);
     }
@@ -339,6 +359,31 @@ class ExcelImportExportTest extends TestCase
             ->assertDontSee('super-secret');
     }
 
+    public function test_templates_include_sample_rows(): void
+    {
+        $user = $this->userWithPermissions([
+            'import_customers',
+            'import_users',
+            'import_holidays',
+            'import_project_preparations',
+        ]);
+
+        $customerTemplate = $this->actingAs($user)->get(route('import-templates.customers'));
+        $this->assertSame('Budi Santoso', $this->worksheetRows($customerTemplate)[1][0]);
+
+        $userTemplate = $this->actingAs($user)->get(route('import-templates.users'));
+        $this->assertSame('Admin Contoh', $this->worksheetRows($userTemplate)[1][0]);
+
+        $holidayTemplate = $this->actingAs($user)->get(route('import-templates.holidays'));
+        $this->assertSame('Hari Kemerdekaan', $this->worksheetRows($holidayTemplate)[1][1]);
+
+        $projectTemplate = $this->actingAs($user)->get(route('import-templates.project-preparations'));
+        $spreadsheet = IOFactory::load($projectTemplate->baseResponse->getFile()->getPathname());
+
+        $this->assertSame('Project Contoh Implementasi', $spreadsheet->getSheet(0)->toArray()[1][1]);
+        $this->assertSame('Project Contoh Implementasi', $spreadsheet->getSheet(4)->toArray()[1][2]);
+    }
+
     /**
      * @param  array<int, string>  $permissions
      */
@@ -367,5 +412,15 @@ class ExcelImportExportTest extends TestCase
             null,
             true,
         );
+    }
+
+    /**
+     * @return array<int, array<int, mixed>>
+     */
+    private function worksheetRows($response): array
+    {
+        return IOFactory::load($response->baseResponse->getFile()->getPathname())
+            ->getActiveSheet()
+            ->toArray();
     }
 }

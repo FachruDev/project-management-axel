@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Exports\ArraySheetExport;
 use App\Exports\UsersExport;
+use App\Http\Controllers\Concerns\HandlesExcelTransfers;
 use App\Http\Requests\ImportExcelRequest;
-use App\Services\Excel\ExcelImportException;
 use App\Services\Excel\UserExcelService;
 use Illuminate\Http\RedirectResponse;
 use Maatwebsite\Excel\Facades\Excel;
@@ -13,24 +13,23 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class UserExcelController extends Controller
 {
-    public function export(): BinaryFileResponse
+    use HandlesExcelTransfers;
+
+    public function export(): BinaryFileResponse|RedirectResponse
     {
-        return Excel::download(new UsersExport, 'users.xlsx');
+        return $this->downloadExcel('User export failed', fn (): BinaryFileResponse => Excel::download(new UsersExport, 'users.xlsx'));
     }
 
-    public function template(UserExcelService $service): BinaryFileResponse
+    public function template(UserExcelService $service): BinaryFileResponse|RedirectResponse
     {
-        return Excel::download(new ArraySheetExport('Users', $service->headings()), 'users-template.xlsx');
+        return $this->downloadExcel(
+            'User template download failed',
+            fn (): BinaryFileResponse => Excel::download(new ArraySheetExport('Users', $service->headings(), $service->sampleRows()), 'users-template.xlsx'),
+        );
     }
 
     public function import(ImportExcelRequest $request, UserExcelService $service): RedirectResponse
     {
-        try {
-            $summary = $service->import($request->file('file'));
-        } catch (ExcelImportException $exception) {
-            return back()->with('import_errors', $exception->errors());
-        }
-
-        return back()->with('success', "Users imported. Created: {$summary->created}, updated: {$summary->updated}.");
+        return $this->importExcel('User import failed', fn () => $service->import($request->file('file')), 'Users');
     }
 }

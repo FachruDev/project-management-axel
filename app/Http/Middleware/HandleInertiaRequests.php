@@ -56,7 +56,8 @@ class HandleInertiaRequests extends Middleware
             ],
             'flash' => [
                 'success' => fn (): mixed => $request->session()->get('success'),
-                'import_errors' => fn (): mixed => $request->session()->get('import_errors'),
+                'excel_error_title' => fn (): mixed => $request->session()->get('excel_error_title'),
+                'excel_errors' => fn (): mixed => $request->session()->get('excel_errors'),
                 'calculation_summary' => fn (): mixed => $request->session()->get('calculation_summary'),
             ],
         ];

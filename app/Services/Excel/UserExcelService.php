@@ -2,12 +2,10 @@
 
 namespace App\Services\Excel;
 
-use App\Imports\RawExcelImport;
 use App\Models\Department;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Role;
 
 class UserExcelService
@@ -22,10 +20,15 @@ class UserExcelService
 
     public function import(UploadedFile $file): ImportSummary
     {
-        $rows = Excel::toArray(new RawExcelImport, $file)[0] ?? [];
+        $rows = ExcelWorkbook::sheets($file, 'Users import')[0] ?? [];
         $errors = [];
         $created = 0;
         $updated = 0;
+        $headingErrors = ExcelWorkbook::headingErrors($rows, $this->headings(), 'Users sheet', true);
+
+        if ($headingErrors !== []) {
+            throw new ExcelImportException($headingErrors);
+        }
 
         return DB::transaction(function () use ($rows, &$errors, &$created, &$updated): ImportSummary {
             foreach ($rows as $index => $row) {
@@ -108,6 +111,16 @@ class UserExcelService
 
             return new ImportSummary($created, $updated);
         });
+    }
+
+    /**
+     * @return array<int, array<int, mixed>>
+     */
+    public function sampleRows(): array
+    {
+        return [
+            ['Admin Contoh', 'admin.contoh@example.com', 'EXT-001', 'IT', 'admin,support', 'change-me-123', 1],
+        ];
     }
 
     /**

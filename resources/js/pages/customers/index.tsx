@@ -49,7 +49,11 @@ export default function CustomerIndex({ customers, filters }: Props) {
     const [editing, setEditing] = useState<CustomerSummary | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     const flash = usePage().props.flash as
-        | { success?: string | null; import_errors?: string[] | null }
+        | {
+              success?: string | null;
+              excel_error_title?: string | null;
+              excel_errors?: string[] | null;
+          }
         | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
 
@@ -158,11 +162,13 @@ export default function CustomerIndex({ customers, filters }: Props) {
                     {errors.customer}
                 </div>
             )}
-            {flash?.import_errors && (
+            {flash?.excel_errors && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    <p className="font-medium">Import failed.</p>
+                    <p className="font-medium">
+                        {flash.excel_error_title ?? 'Excel process failed'}
+                    </p>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
-                        {flash.import_errors.map((error) => (
+                        {flash.excel_errors.map((error) => (
                             <li key={error}>{error}</li>
                         ))}
                     </ul>

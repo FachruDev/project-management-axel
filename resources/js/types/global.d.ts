@@ -18,7 +18,8 @@ declare module '@inertiajs/core' {
             };
             flash: {
                 success: string | null;
-                import_errors: string[] | null;
+                excel_error_title: string | null;
+                excel_errors: string[] | null;
                 calculation_summary: IncentiveCalculationSummary | null;
             };
             sidebarOpen: boolean;

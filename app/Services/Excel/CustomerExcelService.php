@@ -2,11 +2,9 @@
 
 namespace App\Services\Excel;
 
-use App\Imports\RawExcelImport;
 use App\Models\Customer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Maatwebsite\Excel\Facades\Excel;
 
 class CustomerExcelService
 {
@@ -20,10 +18,15 @@ class CustomerExcelService
 
     public function import(UploadedFile $file): ImportSummary
     {
-        $rows = Excel::toArray(new RawExcelImport, $file)[0] ?? [];
+        $rows = ExcelWorkbook::sheets($file, 'Customers import')[0] ?? [];
         $errors = [];
         $created = 0;
         $updated = 0;
+        $headingErrors = ExcelWorkbook::headingErrors($rows, $this->headings(), 'Customers sheet', true);
+
+        if ($headingErrors !== []) {
+            throw new ExcelImportException($headingErrors);
+        }
 
         return DB::transaction(function () use ($rows, &$errors, &$created, &$updated): ImportSummary {
             foreach ($rows as $index => $row) {
@@ -80,5 +83,15 @@ class CustomerExcelService
 
             return new ImportSummary($created, $updated);
         });
+    }
+
+    /**
+     * @return array<int, array<int, mixed>>
+     */
+    public function sampleRows(): array
+    {
+        return [
+            ['Budi Santoso', 'budi.customer@example.com', 'PT Contoh Sukses', 'Jl. Contoh No. 1, Jakarta', 1],
+        ];
     }
 }

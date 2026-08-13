@@ -61,7 +61,11 @@ export default function ProjectPreparationIndex({
     const [modalOpen, setModalOpen] = useState(false);
     const [customerSearch, setCustomerSearch] = useState('');
     const flash = usePage().props.flash as
-        | { success?: string | null; import_errors?: string[] | null }
+        | {
+              success?: string | null;
+              excel_error_title?: string | null;
+              excel_errors?: string[] | null;
+          }
         | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
     const form = useForm<ProjectPayload>(blankProject);
@@ -169,11 +173,13 @@ export default function ProjectPreparationIndex({
 
             {flash?.success && <Alert tone="success">{flash.success}</Alert>}
             {errors?.project && <Alert tone="danger">{errors.project}</Alert>}
-            {flash?.import_errors && (
+            {flash?.excel_errors && (
                 <Alert tone="danger">
-                    <p className="font-medium">Import failed.</p>
+                    <p className="font-medium">
+                        {flash.excel_error_title ?? 'Excel process failed'}
+                    </p>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
-                        {flash.import_errors.map((error) => (
+                        {flash.excel_errors.map((error) => (
                             <li key={error}>{error}</li>
                         ))}
                     </ul>

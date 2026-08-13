@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Exports\ArraySheetExport;
 use App\Exports\HolidaysExport;
+use App\Http\Controllers\Concerns\HandlesExcelTransfers;
 use App\Http\Requests\ImportExcelRequest;
-use App\Services\Excel\ExcelImportException;
 use App\Services\Excel\HolidayExcelService;
 use Illuminate\Http\RedirectResponse;
 use Maatwebsite\Excel\Facades\Excel;
@@ -13,24 +13,23 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class HolidayExcelController extends Controller
 {
-    public function export(): BinaryFileResponse
+    use HandlesExcelTransfers;
+
+    public function export(): BinaryFileResponse|RedirectResponse
     {
-        return Excel::download(new HolidaysExport, 'holidays.xlsx');
+        return $this->downloadExcel('Holiday export failed', fn (): BinaryFileResponse => Excel::download(new HolidaysExport, 'holidays.xlsx'));
     }
 
-    public function template(HolidayExcelService $service): BinaryFileResponse
+    public function template(HolidayExcelService $service): BinaryFileResponse|RedirectResponse
     {
-        return Excel::download(new ArraySheetExport('Holidays', $service->headings()), 'holidays-template.xlsx');
+        return $this->downloadExcel(
+            'Holiday template download failed',
+            fn (): BinaryFileResponse => Excel::download(new ArraySheetExport('Holidays', $service->headings(), $service->sampleRows()), 'holidays-template.xlsx'),
+        );
     }
 
     public function import(ImportExcelRequest $request, HolidayExcelService $service): RedirectResponse
     {
-        try {
-            $summary = $service->import($request->file('file'));
-        } catch (ExcelImportException $exception) {
-            return back()->with('import_errors', $exception->errors());
-        }
-
-        return back()->with('success', "Holidays imported. Created: {$summary->created}, updated: {$summary->updated}.");
+        return $this->importExcel('Holiday import failed', fn () => $service->import($request->file('file')), 'Holidays');
     }
 }

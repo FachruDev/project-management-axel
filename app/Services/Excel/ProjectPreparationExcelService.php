@@ -4,7 +4,6 @@ namespace App\Services\Excel;
 
 use App\Enums\ProjectStatus;
 use App\Enums\TaskStatus;
-use App\Imports\RawExcelImport;
 use App\Models\Customer;
 use App\Models\IncentivePicLevelRule;
 use App\Models\IncentiveProfile;
@@ -18,7 +17,6 @@ use App\Models\User;
 use App\Services\Projects\ProjectAuditLogger;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Maatwebsite\Excel\Facades\Excel;
 
 class ProjectPreparationExcelService
 {
@@ -40,7 +38,13 @@ class ProjectPreparationExcelService
 
     public function import(UploadedFile $file, User $actor): ImportSummary
     {
-        $sheets = Excel::toArray(new RawExcelImport, $file);
+        $sheets = ExcelWorkbook::sheets($file, 'Project preparation import');
+        $sheetErrors = $this->sheetErrors($sheets);
+
+        if ($sheetErrors !== []) {
+            throw new ExcelImportException($sheetErrors);
+        }
+
         $projectRows = $sheets[0] ?? [];
         $customerRows = $sheets[1] ?? [];
         $memberRows = $sheets[2] ?? [];
@@ -179,6 +183,56 @@ class ProjectPreparationExcelService
 
             return new ImportSummary($created, $updated);
         });
+    }
+
+    /**
+     * @return array<int, array<int, array<int, mixed>>>
+     */
+    public function sampleSheets(): array
+    {
+        return [
+            [
+                ['', 'Project Contoh Implementasi', '2026-08-20', 12, 'INCENTIVE', 1, 'pm@example.com', 'requester@example.com', 'Jakarta', '2026-08-19', 'URS-001', '2026-08-21', '2026-08-30', '', ''],
+            ],
+            [
+                ['', 'Project Contoh Implementasi', '2026-08-20', 'customer@example.com', 'PT Contoh Sukses', 1],
+            ],
+            [
+                ['', 'Project Contoh Implementasi', '2026-08-20', 'developer@example.com', 'DEV', 'L1', 0],
+            ],
+            [
+                ['', 'Project Contoh Implementasi', '2026-08-20', 'viewer@example.com', 'view'],
+            ],
+            [
+                ['', '', 'Project Contoh Implementasi', '2026-08-20', 'Prepare URS', 'Analysis', 'developer@example.com', TaskStatus::Todo->value, 'Contoh task tanpa attachment', '2026-08-21', '2026-08-22'],
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<int, array<int, array<string, mixed>>>  $sheets
+     * @return array<int, string>
+     */
+    private function sheetErrors(array $sheets): array
+    {
+        $errors = [];
+        $sheetNames = ['Projects', 'Project Customers', 'Members', 'Access Rules', 'Tasks'];
+        $headings = $this->headings();
+
+        foreach ($sheetNames as $index => $sheetName) {
+            if (! array_key_exists($index, $sheets)) {
+                $errors[] = "{$sheetName} sheet is missing. Download the latest project preparation template and keep all five sheets.";
+
+                continue;
+            }
+
+            array_push(
+                $errors,
+                ...ExcelWorkbook::headingErrors($sheets[$index], $headings[$index], "{$sheetName} sheet", $index === 0),
+            );
+        }
+
+        return $errors;
     }
 
     /**
