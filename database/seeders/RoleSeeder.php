@@ -23,7 +23,7 @@ class RoleSeeder extends Seeder
 
         $adminPermissions = Permission::query()
             ->where('guard_name', 'web')
-            ->whereNotIn('name', ['manage_users'])
+            ->whereNotIn('name', ['manage_users', 'export_users', 'import_users'])
             ->pluck('name')
             ->all();
 

@@ -7,6 +7,12 @@ import {
     store,
     update,
 } from '@/actions/App/Http/Controllers/UserController';
+import {
+    exportMethod as exportUsers,
+    importMethod as importUsers,
+    template as userTemplate,
+} from '@/actions/App/Http/Controllers/UserExcelController';
+import { ExcelTransferActions } from '@/components/excel-transfer-actions';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { SlideOver } from '@/components/slide-over';
@@ -55,7 +61,9 @@ export default function UserIndex({ users, filters, departments, roles }: Props)
     const [departmentId, setDepartmentId] = useState(filters.department_id ?? '');
     const [editing, setEditing] = useState<UserSummary | null>(null);
     const [panelOpen, setPanelOpen] = useState(false);
-    const flash = usePage().props.flash as { success?: string | null } | undefined;
+    const flash = usePage().props.flash as
+        | { success?: string | null; import_errors?: string[] | null }
+        | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
     const form = useForm<UserPayload>(blankUser);
 
@@ -147,13 +155,20 @@ export default function UserIndex({ users, filters, departments, roles }: Props)
                 eyebrow="Administration"
                 title="Users"
                 actions={
-                    <button
-                        type="button"
-                        onClick={openCreate}
-                        className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-                    >
-                        New User
-                    </button>
+                    <>
+                        <ExcelTransferActions
+                            exportUrl={exportUsers.url()}
+                            templateUrl={userTemplate.url()}
+                            importUrl={importUsers.url()}
+                        />
+                        <button
+                            type="button"
+                            onClick={openCreate}
+                            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                        >
+                            New User
+                        </button>
+                    </>
                 }
             />
 
@@ -165,6 +180,16 @@ export default function UserIndex({ users, filters, departments, roles }: Props)
             {errors?.user && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {errors.user}
+                </div>
+            )}
+            {flash?.import_errors && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <p className="font-medium">Import failed.</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                        {flash.import_errors.map((error) => (
+                            <li key={error}>{error}</li>
+                        ))}
+                    </ul>
                 </div>
             )}
 

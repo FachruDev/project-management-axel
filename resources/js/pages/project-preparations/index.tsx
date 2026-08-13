@@ -8,8 +8,14 @@ import {
     submitApproval,
     update,
 } from '@/actions/App/Http/Controllers/ProjectController';
+import {
+    exportMethod as exportProjectPreparations,
+    importMethod as importProjectPreparations,
+    template as projectPreparationTemplate,
+} from '@/actions/App/Http/Controllers/ProjectPreparationExcelController';
 import { show as preparationShow } from '@/actions/App/Http/Controllers/ProjectPreparationController';
 import preparationIndex from '@/actions/App/Http/Controllers/ProjectPreparationIndexController';
+import { ExcelTransferActions } from '@/components/excel-transfer-actions';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { ProjectStatusBadge } from '@/components/project-status-badge';
@@ -54,7 +60,9 @@ export default function ProjectPreparationIndex({
     const [editing, setEditing] = useState<ProjectSummary | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     const [customerSearch, setCustomerSearch] = useState('');
-    const flash = usePage().props.flash as { success?: string | null } | undefined;
+    const flash = usePage().props.flash as
+        | { success?: string | null; import_errors?: string[] | null }
+        | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
     const form = useForm<ProjectPayload>(blankProject);
 
@@ -142,18 +150,35 @@ export default function ProjectPreparationIndex({
                 title="Project Preparation"
                 description="Draft, pending approval, dan rejected dikelola di sini sebelum masuk operational Kanban."
                 actions={
-                    <button
-                        type="button"
-                        onClick={openCreate}
-                        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
-                    >
-                        New Draft
-                    </button>
+                    <>
+                        <ExcelTransferActions
+                            exportUrl={exportProjectPreparations.url()}
+                            templateUrl={projectPreparationTemplate.url()}
+                            importUrl={importProjectPreparations.url()}
+                        />
+                        <button
+                            type="button"
+                            onClick={openCreate}
+                            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                        >
+                            New Draft
+                        </button>
+                    </>
                 }
             />
 
             {flash?.success && <Alert tone="success">{flash.success}</Alert>}
             {errors?.project && <Alert tone="danger">{errors.project}</Alert>}
+            {flash?.import_errors && (
+                <Alert tone="danger">
+                    <p className="font-medium">Import failed.</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                        {flash.import_errors.map((error) => (
+                            <li key={error}>{error}</li>
+                        ))}
+                    </ul>
+                </Alert>
+            )}
 
             <form
                 onSubmit={submitFilters}

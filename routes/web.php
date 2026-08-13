@@ -1,15 +1,18 @@
 <?php
 
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerExcelController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\HolidayController;
+use App\Http\Controllers\HolidayExcelController;
 use App\Http\Controllers\IncentiveProfileController;
 use App\Http\Controllers\ProjectApprovalController;
 use App\Http\Controllers\ProjectBulkDeleteController;
 use App\Http\Controllers\ProjectBulkTaskController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectPreparationController;
+use App\Http\Controllers\ProjectPreparationExcelController;
 use App\Http\Controllers\ProjectPreparationIndexController;
 use App\Http\Controllers\ProjectStatusMoveController;
 use App\Http\Controllers\ProjectTaskBulkDeleteController;
@@ -19,11 +22,52 @@ use App\Http\Controllers\ProjectTaskTypeController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\TaskBoardController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\UserExcelController;
 use App\Http\Controllers\WorkingDayRuleController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('portal.auth')->group(function (): void {
     Route::get('/', DashboardController::class)->name('home');
+
+    Route::get('exports/customers', [CustomerExcelController::class, 'export'])
+        ->middleware('can:export_customers')
+        ->name('exports.customers');
+    Route::get('import-templates/customers', [CustomerExcelController::class, 'template'])
+        ->middleware('can:import_customers')
+        ->name('import-templates.customers');
+    Route::post('imports/customers', [CustomerExcelController::class, 'import'])
+        ->middleware('can:import_customers')
+        ->name('imports.customers');
+
+    Route::get('exports/users', [UserExcelController::class, 'export'])
+        ->middleware('can:export_users')
+        ->name('exports.users');
+    Route::get('import-templates/users', [UserExcelController::class, 'template'])
+        ->middleware('can:import_users')
+        ->name('import-templates.users');
+    Route::post('imports/users', [UserExcelController::class, 'import'])
+        ->middleware('can:import_users')
+        ->name('imports.users');
+
+    Route::get('exports/holidays', [HolidayExcelController::class, 'export'])
+        ->middleware('can:export_holidays')
+        ->name('exports.holidays');
+    Route::get('import-templates/holidays', [HolidayExcelController::class, 'template'])
+        ->middleware('can:import_holidays')
+        ->name('import-templates.holidays');
+    Route::post('imports/holidays', [HolidayExcelController::class, 'import'])
+        ->middleware('can:import_holidays')
+        ->name('imports.holidays');
+
+    Route::get('exports/project-preparations', [ProjectPreparationExcelController::class, 'export'])
+        ->middleware('can:export_project_preparations')
+        ->name('exports.project-preparations');
+    Route::get('import-templates/project-preparations', [ProjectPreparationExcelController::class, 'template'])
+        ->middleware('can:import_project_preparations')
+        ->name('import-templates.project-preparations');
+    Route::post('imports/project-preparations', [ProjectPreparationExcelController::class, 'import'])
+        ->middleware('can:import_project_preparations')
+        ->name('imports.project-preparations');
 
     Route::get('project-approvals', [ProjectApprovalController::class, 'index'])
         ->middleware('can:approve_projects')

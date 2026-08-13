@@ -7,6 +7,12 @@ import {
     store,
     update,
 } from '@/actions/App/Http/Controllers/HolidayController';
+import {
+    exportMethod as exportHolidays,
+    importMethod as importHolidays,
+    template as holidayTemplate,
+} from '@/actions/App/Http/Controllers/HolidayExcelController';
+import { ExcelTransferActions } from '@/components/excel-transfer-actions';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
@@ -51,7 +57,9 @@ export default function HolidaysIndex({ holidays, filters, types }: Props) {
     const [type, setType] = useState(filters.type ?? '');
     const [editing, setEditing] = useState<HolidaySummary | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
-    const flash = usePage().props.flash as { success?: string | null } | undefined;
+    const flash = usePage().props.flash as
+        | { success?: string | null; import_errors?: string[] | null }
+        | undefined;
     const form = useForm<HolidayPayload>(blankHoliday);
 
     function submitFilters(event: FormEvent<HTMLFormElement>) {
@@ -127,19 +135,36 @@ export default function HolidaysIndex({ holidays, filters, types }: Props) {
                 title="Holidays"
                 description="Kelola hari libur nasional/perusahaan dan override hari masuk kerja untuk SLA."
                 actions={
-                    <button
-                        type="button"
-                        onClick={openCreate}
-                        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
-                    >
-                        New Holiday
-                    </button>
+                    <>
+                        <ExcelTransferActions
+                            exportUrl={exportHolidays.url()}
+                            templateUrl={holidayTemplate.url()}
+                            importUrl={importHolidays.url()}
+                        />
+                        <button
+                            type="button"
+                            onClick={openCreate}
+                            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                        >
+                            New Holiday
+                        </button>
+                    </>
                 }
             />
 
             {flash?.success && (
                 <div className="rounded-lg border border-emerald-200 bg-pastel-green px-4 py-3 text-sm text-emerald-800">
                     {flash.success}
+                </div>
+            )}
+            {flash?.import_errors && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <p className="font-medium">Import failed.</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                        {flash.import_errors.map((error) => (
+                            <li key={error}>{error}</li>
+                        ))}
+                    </ul>
                 </div>
             )}
 

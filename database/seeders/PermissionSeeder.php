@@ -25,6 +25,8 @@ class PermissionSeeder extends Seeder
                 'manage_projects',
                 'view_projects',
                 'approve_projects',
+                'export_project_preparations',
+                'import_project_preparations',
             ],
             'task' => [
                 'manage_tasks',
@@ -34,10 +36,16 @@ class PermissionSeeder extends Seeder
                 'manage_departments',
                 'manage_customers',
                 'manage_working_calendar',
+                'export_customers',
+                'import_customers',
+                'export_holidays',
+                'import_holidays',
             ],
             'administration' => [
                 'manage_users',
                 'manage_roles',
+                'export_users',
+                'import_users',
             ],
         ];
 

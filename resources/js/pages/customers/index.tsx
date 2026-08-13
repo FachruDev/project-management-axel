@@ -7,6 +7,12 @@ import {
     store,
     update,
 } from '@/actions/App/Http/Controllers/CustomerController';
+import {
+    exportMethod as exportCustomers,
+    importMethod as importCustomers,
+    template as customerTemplate,
+} from '@/actions/App/Http/Controllers/CustomerExcelController';
+import { ExcelTransferActions } from '@/components/excel-transfer-actions';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
@@ -42,7 +48,9 @@ export default function CustomerIndex({ customers, filters }: Props) {
     const [status, setStatus] = useState(filters.status ?? '');
     const [editing, setEditing] = useState<CustomerSummary | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
-    const flash = usePage().props.flash as { success?: string | null } | undefined;
+    const flash = usePage().props.flash as
+        | { success?: string | null; import_errors?: string[] | null }
+        | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
 
     const form = useForm<CustomerPayload>(blankCustomer);
@@ -123,13 +131,20 @@ export default function CustomerIndex({ customers, filters }: Props) {
                 eyebrow="Master Data"
                 title="Customers"
                 actions={
-                    <button
-                        type="button"
-                        onClick={openCreate}
-                        className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-                    >
-                        New Customer
-                    </button>
+                    <>
+                        <ExcelTransferActions
+                            exportUrl={exportCustomers.url()}
+                            templateUrl={customerTemplate.url()}
+                            importUrl={importCustomers.url()}
+                        />
+                        <button
+                            type="button"
+                            onClick={openCreate}
+                            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                        >
+                            New Customer
+                        </button>
+                    </>
                 }
             />
 
@@ -141,6 +156,16 @@ export default function CustomerIndex({ customers, filters }: Props) {
             {errors?.customer && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {errors.customer}
+                </div>
+            )}
+            {flash?.import_errors && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <p className="font-medium">Import failed.</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                        {flash.import_errors.map((error) => (
+                            <li key={error}>{error}</li>
+                        ))}
+                    </ul>
                 </div>
             )}
 
