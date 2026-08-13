@@ -270,10 +270,10 @@ class ProjectWriteService
         $membersByUserId = $project->members()->get()->keyBy('user_id');
 
         foreach ($tasks as $task) {
-            $status = TaskStatus::from((string) $task['status']);
             $projectMember = empty($task['pic_user_id'])
                 ? null
                 : $membersByUserId->get((int) $task['pic_user_id']);
+            $status = $this->taskStatusForPayload($task, $projectMember);
             $payload = [
                 'task_type_id' => $this->validatedTaskTypeId($project, $task['task_type_id'] ?? null),
                 'project_member_id' => $projectMember?->id,
@@ -321,6 +321,20 @@ class ProjectWriteService
             );
             $this->storeTaskFiles($projectTask, Arr::wrap($task['attachments'] ?? []), $actor);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $task
+     */
+    private function taskStatusForPayload(array $task, ?ProjectMember $projectMember): TaskStatus
+    {
+        $status = TaskStatus::from((string) $task['status']);
+
+        if (empty($task['id']) && $projectMember instanceof ProjectMember && $status === TaskStatus::Todo) {
+            return TaskStatus::Assigned;
+        }
+
+        return $status;
     }
 
     private function validatedTaskTypeId(Project $project, mixed $taskTypeId): ?int

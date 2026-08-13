@@ -1,4 +1,4 @@
-import { Link, router, usePage } from '@inertiajs/react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
 import { useEcho } from '@laravel/echo-react';
 import {
     Search,
@@ -7,8 +7,7 @@ import {
     Trash2,
     Calendar,
     FolderKanban,
-    GripHorizontal,
-    ArrowRight
+    Info,
 } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { useEffect, useState } from 'react';
@@ -16,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { create as createProjectTasks } from '@/actions/App/Http/Controllers/ProjectBulkTaskController';
 import { show as projectShow } from '@/actions/App/Http/Controllers/ProjectController';
 import bulkDeleteTasks from '@/actions/App/Http/Controllers/ProjectTaskBulkDeleteController';
+import { update as updateTask } from '@/actions/App/Http/Controllers/ProjectTaskController';
 import deleteTask from '@/actions/App/Http/Controllers/ProjectTaskDeleteController';
 import updateTaskStatus from '@/actions/App/Http/Controllers/ProjectTaskStatusController';
 import taskBoardIndex from '@/actions/App/Http/Controllers/TaskBoardController';
@@ -26,6 +26,7 @@ import {
 } from '@/components/kanban';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
+import { SlideOver } from '@/components/slide-over';
 import { AppLayout } from '@/layouts/app-layout';
 import type {
     Auth,
@@ -55,7 +56,19 @@ type BoardChangedEvent = {
     actor_id?: number | null;
     new_status?: ProjectTaskStatus | null;
     old_status?: ProjectTaskStatus | null;
+    task?: TaskKanbanCard | null;
     task_id?: number | null;
+};
+
+type TaskFormPayload = {
+    name: string;
+    task_type_id: string;
+    pic_user_id: string;
+    status: ProjectTaskStatus;
+    description: string;
+    plan_start_date: string;
+    plan_end_date: string;
+    reason: string;
 };
 
 const taskStatusRank: Record<ProjectTaskStatus, number> = {
@@ -68,9 +81,9 @@ const taskStatusRank: Record<ProjectTaskStatus, number> = {
 
 const taskForwardTargets: Record<ProjectTaskStatus, ProjectTaskStatus[]> = {
     todo: ['assigned', 'cancelled'],
-    assigned: ['inprogress', 'cancelled'],
-    inprogress: ['done', 'cancelled'],
-    done: [],
+    assigned: ['todo', 'inprogress', 'cancelled'],
+    inprogress: ['assigned', 'done', 'cancelled'],
+    done: ['inprogress'],
     cancelled: [],
 };
 
@@ -84,6 +97,8 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
     const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
     const [moveReason, setMoveReason] = useState('');
     const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
+    const [detailTask, setDetailTask] = useState<TaskKanbanCard | null>(null);
+    const [moveError, setMoveError] = useState<string | null>(null);
 
     const flash = usePage().props.flash as { success?: string | null } | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
@@ -137,6 +152,9 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
     function performMove(task: TaskKanbanCard, status: ProjectTaskStatus, reason = '') {
         const previousColumns = boardColumns;
 
+        setMoveError(null);
+        setBoardColumns(moveTaskForCurrentFilter(previousColumns, task.id, status, due));
+
         router.patch(
             updateTaskStatus.url(task.id),
             { status, reason },
@@ -144,11 +162,9 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
                 preserveScroll: true,
                 preserveState: true,
                 only: ['flash'],
-                onBefore: () => {
-                    setBoardColumns(moveTaskForCurrentFilter(previousColumns, task.id, status, due));
-                },
-                onError: () => {
+                onError: (errors) => {
                     setBoardColumns(previousColumns);
+                    setMoveError(firstError(errors) ?? 'Task status could not be updated.');
                 },
                 onSuccess: () => setPendingMove(null),
             },
@@ -175,6 +191,12 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
             return;
         }
 
+        if (event.action === 'task_updated' && event.task) {
+            setBoardColumns((current) => upsertTaskForCurrentFilter(current, event.task as TaskKanbanCard, due));
+
+            return;
+        }
+
         if (!event.new_status) return;
 
         setBoardColumns((current) =>
@@ -194,6 +216,11 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
         if (!window.confirm(`Delete task "${task.name}"?`)) return;
 
         router.delete(deleteTask.url(task.id), { preserveScroll: true });
+    }
+
+    function updateBoardTask(task: TaskKanbanCard) {
+        setBoardColumns((current) => upsertTaskForCurrentFilter(current, task, due));
+        setDetailTask(task);
     }
 
     function bulkRemoveTasks() {
@@ -234,6 +261,7 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
                 {flash?.success && <Alert tone="success">{flash.success}</Alert>}
                 {errors?.status && <Alert tone="danger">{errors.status}</Alert>}
                 {errors?.reason && <Alert tone="danger">{errors.reason}</Alert>}
+                {moveError && <Alert tone="danger">{moveError}</Alert>}
 
                 {/* Filter Toolbar Jira Style */}
                 <form
@@ -315,11 +343,11 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
                                 <TaskCard
                                     key={task.id}
                                     task={task}
-                                    onStatus={requestStatus}
                                     selected={selectedTaskIds.includes(task.id)}
                                     canManageTasks={canManageTasks}
                                     onToggleSelected={toggleTaskSelection}
                                     onDelete={removeTask}
+                                    onShowDetail={setDetailTask}
                                 />
                             ))}
                             {column.tasks.length === 0 && (
@@ -364,6 +392,21 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
                     </form>
                 </Modal>
 
+                <SlideOver
+                    open={detailTask !== null}
+                    title={detailTask?.name ?? 'Task Detail'}
+                    onClose={() => setDetailTask(null)}
+                >
+                    {detailTask && (
+                        <TaskDetailPanel
+                            task={detailTask}
+                            canManageTasks={canManageTasks}
+                            options={options}
+                            onUpdated={updateBoardTask}
+                        />
+                    )}
+                </SlideOver>
+
             </div>
         </AppLayout>
     );
@@ -372,34 +415,25 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
 {/* Jira-Style Task Card Component - Disamakan 100% dengan ProjectCard */}
 function TaskCard({
     task,
-    onStatus,
     selected,
     canManageTasks,
     onToggleSelected,
     onDelete,
+    onShowDetail,
 }: {
     task: TaskKanbanCard;
-    onStatus: (task: TaskKanbanCard, status: ProjectTaskStatus) => void;
     selected: boolean;
     canManageTasks: boolean;
     onToggleSelected: (taskId: number) => void;
     onDelete: (task: TaskKanbanCard) => void;
+    onShowDetail: (task: TaskKanbanCard) => void;
 }) {
     return (
         <DraggableKanbanCard id={String(task.id)} selected={selected}>
-            <div className="group relative z-10 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition-all hover:z-20 hover:border-slate-300 hover:shadow-md active:z-50 active:scale-[1.02] active:shadow-xl cursor-grab active:cursor-grabbing">
-
-                {/* Drag Handle Top Center Pill */}
-                <div className="absolute left-1/2 top-1.5 h-1 w-8 -translate-x-1/2 rounded-full bg-slate-200 opacity-0 transition-opacity group-hover:opacity-100"></div>
-
+            <div className="group relative z-10 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition-all hover:z-20 hover:border-slate-300 hover:shadow-md active:z-50 active:scale-[1.02] active:shadow-xl">
                 {/* Card Header */}
-                <div className="mt-1 flex items-start justify-between gap-2">
+                <div className="ml-8 mt-1 flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
-                        {/* Area Drag Icon */}
-                        <div className="text-slate-300 opacity-0 transition-opacity group-hover:opacity-100">
-                            <GripHorizontal className="h-4 w-4" />
-                        </div>
-
                         {canManageTasks && (
                             <input
                                 type="checkbox"
@@ -433,6 +467,14 @@ function TaskCard({
                         className="flex items-center gap-1 opacity-80 transition-opacity group-hover:opacity-100"
                         onPointerDown={(e) => e.stopPropagation()}
                     >
+                        <button
+                            type="button"
+                            title="Task Detail"
+                            onClick={() => onShowDetail(task)}
+                            className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                        >
+                            <Info className="h-3.5 w-3.5" />
+                        </button>
                         {canManageTasks && (
                             <button
                                 type="button"
@@ -476,29 +518,8 @@ function TaskCard({
                     </div>
                 </div>
 
-                {/* Footer Jira Style: Quick Actions & Avatar */}
-                <div className="mt-3 flex items-center justify-between border-t border-slate-50 pt-2">
-                    <div
-                        className="flex flex-wrap gap-1.5 opacity-80 transition-opacity group-hover:opacity-100"
-                        onPointerDown={(e) => e.stopPropagation()}
-                    >
-                        {task.allowed_statuses.map((status) => (
-                            <button
-                                key={status}
-                                type="button"
-                                title={`Move to ${status}`}
-                                onClick={() => onStatus(task, status)}
-                                className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 shadow-xs transition-colors hover:bg-primary hover:text-white"
-                            >
-                                <span>{status.replaceAll('_', ' ')}</span>
-                                <ArrowRight className="h-2.5 w-2.5" />
-                            </button>
-                        ))}
-                        {task.allowed_statuses.length === 0 && (
-                            <span className="text-[10px] font-medium text-slate-400">No actions available</span>
-                        )}
-                    </div>
-
+                {/* Footer Jira Style: PIC Avatar */}
+                <div className="mt-3 flex items-center justify-end border-t border-slate-50 pt-2">
                     {/* PIC Avatar */}
                     <div
                         title={`PIC: ${task.pic?.name ?? task.project?.pm?.name ?? 'Unassigned'}`}
@@ -511,6 +532,311 @@ function TaskCard({
             </div>
         </DraggableKanbanCard>
     );
+}
+
+function TaskDetailPanel({
+    task,
+    canManageTasks,
+    options,
+    onUpdated,
+}: {
+    task: TaskKanbanCard;
+    canManageTasks: boolean;
+    options: TaskBoardProps['options'];
+    onUpdated: (task: TaskKanbanCard) => void;
+}) {
+    const form = useForm<TaskFormPayload>(taskFormPayload(task));
+    const projectId = task.project?.id ?? null;
+    const projectMembers = options.project_members.filter((member) => member.project_id === projectId);
+    const taskTypes = options.task_types.filter((taskType) => taskType.project_id == null || taskType.project_id === projectId);
+    const selectedTaskType = taskTypes.find((taskType) => String(taskType.id) === form.data.task_type_id);
+    const selectedPic = options.users.find((user) => String(user.id) === form.data.pic_user_id) ?? null;
+    const isBackwardMove = isBackwardTaskStatus(task.status, form.data.status);
+
+    useEffect(() => {
+        form.clearErrors();
+        form.setData(taskFormPayload(task));
+    }, [task.id]);
+
+    function submitTask(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+
+        const nextTask: TaskKanbanCard = normalizeEditedTask(task, {
+            ...form.data,
+            reason: isBackwardMove ? form.data.reason : '',
+        }, selectedTaskType ?? null, selectedPic);
+
+        form.transform((data) => ({
+            ...data,
+            reason: isBackwardMove ? data.reason : '',
+        }));
+        form.patch(updateTask.url(task.id), {
+            preserveScroll: true,
+            preserveState: true,
+            only: ['flash'],
+            onSuccess: () => {
+                form.clearErrors();
+                onUpdated(nextTask);
+            },
+        });
+    }
+
+    return (
+        <div className="space-y-5 text-sm">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs font-semibold uppercase text-slate-500">
+                    Status
+                </div>
+                <div className="mt-1 text-base font-semibold text-slate-950">
+                    {task.status}
+                </div>
+            </div>
+
+            {canManageTasks ? (
+                <form onSubmit={submitTask} className="space-y-4">
+                    <div className="grid gap-3">
+                        <label className="grid gap-1 text-xs font-semibold text-slate-700">
+                            Task Name
+                            <input
+                                value={form.data.name}
+                                onChange={(event) => form.setData('name', event.target.value)}
+                                className={inputClass}
+                            />
+                            {form.errors.name && <span className="text-[11px] text-red-600">{form.errors.name}</span>}
+                        </label>
+
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <label className="grid gap-1 text-xs font-semibold text-slate-700">
+                                Task Type
+                                <select
+                                    value={form.data.task_type_id}
+                                    onChange={(event) => form.setData('task_type_id', event.target.value)}
+                                    className={inputClass}
+                                >
+                                    <option value="">No Type</option>
+                                    {taskTypes.map((taskType) => (
+                                        <option key={taskType.id} value={taskType.id}>
+                                            {taskType.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                {form.errors.task_type_id && <span className="text-[11px] text-red-600">{form.errors.task_type_id}</span>}
+                            </label>
+
+                            <label className="grid gap-1 text-xs font-semibold text-slate-700">
+                                PIC
+                                <select
+                                    value={form.data.pic_user_id}
+                                    onChange={(event) => form.setData('pic_user_id', event.target.value)}
+                                    className={inputClass}
+                                >
+                                    <option value="">Unassigned</option>
+                                    {projectMembers.map((member) => (
+                                        <option key={member.user_id} value={member.user_id}>
+                                            {member.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                {form.errors.pic_user_id && <span className="text-[11px] text-red-600">{form.errors.pic_user_id}</span>}
+                            </label>
+                        </div>
+
+                        <label className="grid gap-1 text-xs font-semibold text-slate-700">
+                            Status
+                            <select
+                                value={form.data.status}
+                                onChange={(event) => form.setData('status', event.target.value as ProjectTaskStatus)}
+                                className={inputClass}
+                            >
+                                {options.statuses.map((status) => (
+                                    <option key={status.value} value={status.value}>
+                                        {status.label}
+                                    </option>
+                                ))}
+                            </select>
+                            {form.errors.status && <span className="text-[11px] text-red-600">{form.errors.status}</span>}
+                        </label>
+
+                        {isBackwardMove && (
+                            <label className="grid gap-1 text-xs font-semibold text-slate-700">
+                                Reason
+                                <textarea
+                                    value={form.data.reason}
+                                    onChange={(event) => form.setData('reason', event.target.value)}
+                                    placeholder="Opsional untuk rollback status"
+                                    className={`${inputClass} min-h-[88px] py-2`}
+                                />
+                                {form.errors.reason && <span className="text-[11px] text-red-600">{form.errors.reason}</span>}
+                            </label>
+                        )}
+
+                        <label className="grid gap-1 text-xs font-semibold text-slate-700">
+                            Description
+                            <textarea
+                                value={form.data.description}
+                                onChange={(event) => form.setData('description', event.target.value)}
+                                className={`${inputClass} min-h-[96px] py-2`}
+                            />
+                            {form.errors.description && <span className="text-[11px] text-red-600">{form.errors.description}</span>}
+                        </label>
+
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <label className="grid gap-1 text-xs font-semibold text-slate-700">
+                                Plan Start
+                                <input
+                                    type="date"
+                                    value={form.data.plan_start_date}
+                                    onChange={(event) => form.setData('plan_start_date', event.target.value)}
+                                    className={inputClass}
+                                />
+                                {form.errors.plan_start_date && <span className="text-[11px] text-red-600">{form.errors.plan_start_date}</span>}
+                            </label>
+
+                            <label className="grid gap-1 text-xs font-semibold text-slate-700">
+                                Plan End
+                                <input
+                                    type="date"
+                                    value={form.data.plan_end_date}
+                                    onChange={(event) => form.setData('plan_end_date', event.target.value)}
+                                    className={inputClass}
+                                />
+                                {form.errors.plan_end_date && <span className="text-[11px] text-red-600">{form.errors.plan_end_date}</span>}
+                            </label>
+                        </div>
+                    </div>
+
+                    <DetailGrid
+                        rows={[
+                            ['Project', task.project?.name ?? '-'],
+                            ['Customer', task.project?.customer ?? '-'],
+                            ['Project Status', task.project?.status ?? '-'],
+                            ['PM', task.project?.pm?.name ?? '-'],
+                            ['Actual Start', task.actual_start_date ?? '-'],
+                            ['Actual End', task.actual_end_date ?? '-'],
+                            ['Attachments', `${task.attachments_count} file(s)`],
+                        ]}
+                    />
+
+                    <div className="flex justify-end">
+                        <button
+                            type="submit"
+                            disabled={form.processing}
+                            className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {form.processing ? 'Saving...' : 'Save Task'}
+                        </button>
+                    </div>
+                </form>
+            ) : (
+                <>
+                    <DetailGrid
+                        rows={[
+                            ['Project', task.project?.name ?? '-'],
+                            ['Customer', task.project?.customer ?? '-'],
+                            ['Project Status', task.project?.status ?? '-'],
+                            ['Task Type', task.task_type?.name ?? '-'],
+                            ['PIC', task.pic?.name ?? task.project?.pm?.name ?? '-'],
+                            ['PM', task.project?.pm?.name ?? '-'],
+                            ['Plan Start', task.plan_start_date ?? '-'],
+                            ['Plan End', task.plan_end_date ?? '-'],
+                            ['Actual Start', task.actual_start_date ?? '-'],
+                            ['Actual End', task.actual_end_date ?? '-'],
+                            ['Attachments', `${task.attachments_count} file(s)`],
+                        ]}
+                    />
+
+                    <div>
+                        <div className="text-xs font-semibold uppercase text-slate-500">
+                            Description
+                        </div>
+                        <p className="mt-2 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-700">
+                            {task.description || 'No description.'}
+                        </p>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+function DetailGrid({ rows }: { rows: Array<[string, string]> }) {
+    return (
+        <dl className="grid gap-3">
+            {rows.map(([label, value]) => (
+                <div
+                    key={label}
+                    className="grid gap-1 rounded-lg border border-slate-200 bg-white p-3"
+                >
+                    <dt className="text-xs font-semibold uppercase text-slate-500">
+                        {label}
+                    </dt>
+                    <dd className="text-sm font-medium text-slate-900">
+                        {value}
+                    </dd>
+                </div>
+            ))}
+        </dl>
+    );
+}
+
+function taskFormPayload(task: TaskKanbanCard): TaskFormPayload {
+    return {
+        name: task.name,
+        task_type_id: task.task_type?.id ? String(task.task_type.id) : '',
+        pic_user_id: task.pic?.id ? String(task.pic.id) : '',
+        status: task.status,
+        description: task.description ?? '',
+        plan_start_date: task.plan_start_date ?? '',
+        plan_end_date: task.plan_end_date ?? '',
+        reason: '',
+    };
+}
+
+function normalizeEditedTask(
+    task: TaskKanbanCard,
+    data: TaskFormPayload,
+    taskType: TaskBoardProps['options']['task_types'][number] | null,
+    pic: TaskKanbanCard['pic'],
+): TaskKanbanCard {
+    return {
+        ...task,
+        name: data.name,
+        status: data.status,
+        description: data.description || null,
+        plan_start_date: data.plan_start_date || null,
+        plan_end_date: data.plan_end_date || null,
+        actual_start_date: optimisticActualStartDate(task, data.status),
+        actual_end_date: optimisticActualEndDate(task, data.status),
+        pic,
+        task_type: taskType
+            ? {
+                  id: taskType.id,
+                  name: taskType.name,
+                  color: taskType.color,
+              }
+            : null,
+        allowed_statuses: taskAllowedStatuses(data.status),
+    };
+}
+
+function optimisticActualStartDate(task: TaskKanbanCard, status: ProjectTaskStatus) {
+    if (status === 'todo' || status === 'assigned') {
+        return null;
+    }
+
+    if (status === 'inprogress' || status === 'done') {
+        return task.actual_start_date ?? todayString();
+    }
+
+    return task.actual_start_date;
+}
+
+function optimisticActualEndDate(task: TaskKanbanCard, status: ProjectTaskStatus) {
+    if (status === 'done') {
+        return task.actual_end_date ?? todayString();
+    }
+
+    return null;
 }
 
 function EmptyLane({ children }: { children: ReactNode }) {
@@ -569,6 +895,24 @@ function moveTaskForCurrentFilter(columns: TaskBoardProps['columns'], taskId: nu
     return moveTask(columns, taskId, targetStatus);
 }
 
+function upsertTaskForCurrentFilter(columns: TaskBoardProps['columns'], task: TaskKanbanCard, dueFilter: string) {
+    const existsOnBoard = columns.some((column) => column.tasks.some((item) => item.id === task.id));
+
+    if (!existsOnBoard) {
+        return columns;
+    }
+
+    if ((dueFilter === 'overdue' || dueFilter === 'week') && (task.status === 'done' || task.status === 'cancelled')) {
+        return removeTaskFromColumns(columns, task.id);
+    }
+
+    const withoutTask = removeTaskFromColumns(columns, task.id);
+
+    return withoutTask.map((column) =>
+        column.status === task.status ? { ...column, tasks: [task, ...column.tasks] } : column,
+    );
+}
+
 function removeTaskFromColumns(columns: TaskBoardProps['columns'], taskId: number) {
     return columns.map((column) => ({
         ...column,
@@ -582,4 +926,12 @@ function isBackwardTaskStatus(currentStatus: ProjectTaskStatus, targetStatus: Pr
 
 function taskAllowedStatuses(status: ProjectTaskStatus) {
     return taskForwardTargets[status];
+}
+
+function firstError(errors: Record<string, string>) {
+    return Object.values(errors)[0] ?? null;
+}
+
+function todayString() {
+    return new Date().toISOString().slice(0, 10);
 }

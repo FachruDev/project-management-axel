@@ -21,9 +21,9 @@ class ProjectTaskTransitionService
      */
     private array $allowedTransitions = [
         'todo' => [TaskStatus::Assigned, TaskStatus::Cancelled],
-        'assigned' => [TaskStatus::InProgress, TaskStatus::Cancelled],
-        'inprogress' => [TaskStatus::Done, TaskStatus::Cancelled],
-        'done' => [],
+        'assigned' => [TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Cancelled],
+        'inprogress' => [TaskStatus::Assigned, TaskStatus::Done, TaskStatus::Cancelled],
+        'done' => [TaskStatus::InProgress],
         'cancelled' => [],
     ];
 
@@ -111,8 +111,12 @@ class ProjectTaskTransitionService
             return $task->actual_start_date;
         }
 
+        if ($targetStatus === TaskStatus::Todo || $targetStatus === TaskStatus::Assigned) {
+            return null;
+        }
+
         if ($targetStatus !== TaskStatus::InProgress && $targetStatus !== TaskStatus::Done) {
-            return $currentStatus === TaskStatus::Todo ? null : $task->actual_start_date;
+            return $task->actual_start_date;
         }
 
         return $task->actual_start_date ?? today();

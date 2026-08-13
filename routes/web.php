@@ -17,6 +17,7 @@ use App\Http\Controllers\ProjectPreparationExcelController;
 use App\Http\Controllers\ProjectPreparationIndexController;
 use App\Http\Controllers\ProjectStatusMoveController;
 use App\Http\Controllers\ProjectTaskBulkDeleteController;
+use App\Http\Controllers\ProjectTaskController;
 use App\Http\Controllers\ProjectTaskDeleteController;
 use App\Http\Controllers\ProjectTaskStatusController;
 use App\Http\Controllers\ProjectTaskTypeController;
@@ -156,6 +157,9 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::patch('tasks/{task}/status', ProjectTaskStatusController::class)
         ->middleware('can:manage_tasks')
         ->name('tasks.status.update');
+    Route::patch('tasks/{task}', [ProjectTaskController::class, 'update'])
+        ->middleware('can:manage_tasks')
+        ->name('tasks.update');
     Route::delete('tasks/bulk-delete', ProjectTaskBulkDeleteController::class)
         ->middleware('can:manage_tasks')
         ->name('tasks.bulk-delete');

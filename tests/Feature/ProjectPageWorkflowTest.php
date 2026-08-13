@@ -542,7 +542,7 @@ class ProjectPageWorkflowTest extends TestCase
         $this->assertDatabaseHas('project_tasks', [
             'project_id' => $project->id,
             'name' => 'Bulk Task 1',
-            'status' => TaskStatus::Todo->value,
+            'status' => TaskStatus::Assigned->value,
             'task_type_id' => $taskType->id,
         ]);
         $this->assertDatabaseHas('project_tasks', [
@@ -656,6 +656,197 @@ class ProjectPageWorkflowTest extends TestCase
                 'status' => TaskStatus::Todo->value,
             ])
             ->assertSessionHasErrors('status');
+
+        $this->actingAs($user)
+            ->patch(route('tasks.status.update', $task), [
+                'status' => TaskStatus::Assigned->value,
+                'reason' => 'Need more details.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::Assigned, $task->status);
+        $this->assertNull($task->actual_start_date);
+    }
+
+    public function test_task_can_be_updated_from_drawer_with_status_transition(): void
+    {
+        $user = $this->userWithPermissions(['manage_tasks']);
+        $project = Project::factory()->create(['status' => ProjectStatus::Ongoing]);
+        $member = ProjectMember::factory()->create([
+            'project_id' => $project->id,
+            'user_id' => $user->id,
+        ]);
+        $taskType = TaskType::factory()->create(['project_id' => $project->id]);
+        $task = $project->tasks()->create([
+            'project_member_id' => $member->id,
+            'name' => 'Editable Task',
+            'status' => TaskStatus::Assigned,
+            'plan_start_date' => '2026-08-13',
+            'plan_end_date' => '2026-08-15',
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('tasks.update', $task), [
+                'name' => 'Edited From Drawer',
+                'task_type_id' => $taskType->id,
+                'pic_user_id' => $member->user_id,
+                'status' => TaskStatus::InProgress->value,
+                'description' => 'Updated details.',
+                'plan_start_date' => '2026-08-14',
+                'plan_end_date' => '2026-08-16',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $task->refresh();
+
+        $this->assertSame('Edited From Drawer', $task->name);
+        $this->assertSame($taskType->id, $task->task_type_id);
+        $this->assertSame(TaskStatus::InProgress, $task->status);
+        $this->assertNotNull($task->actual_start_date);
+
+        $this->actingAs($user)
+            ->patch(route('tasks.update', $task), [
+                'name' => 'Edited Rollback Task',
+                'task_type_id' => $taskType->id,
+                'pic_user_id' => $member->user_id,
+                'status' => TaskStatus::Assigned->value,
+                'reason' => 'Need to reassign before progress.',
+                'description' => 'Rollback from drawer.',
+                'plan_start_date' => '2026-08-14',
+                'plan_end_date' => '2026-08-16',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $task->refresh();
+
+        $this->assertSame('Edited Rollback Task', $task->name);
+        $this->assertSame(TaskStatus::Assigned, $task->status);
+        $this->assertNull($task->actual_start_date);
+    }
+
+    public function test_task_update_rejects_pic_outside_project_members(): void
+    {
+        $user = $this->userWithPermissions(['manage_tasks']);
+        $outsideUser = User::factory()->create();
+        $project = Project::factory()->create(['status' => ProjectStatus::Ongoing]);
+        $member = ProjectMember::factory()->create([
+            'project_id' => $project->id,
+            'user_id' => $user->id,
+        ]);
+        $task = $project->tasks()->create([
+            'project_member_id' => $member->id,
+            'name' => 'Scoped PIC Task',
+            'status' => TaskStatus::Assigned,
+            'plan_start_date' => '2026-08-13',
+            'plan_end_date' => '2026-08-15',
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('tasks.update', $task), [
+                'name' => 'Invalid PIC Task',
+                'task_type_id' => null,
+                'pic_user_id' => $outsideUser->id,
+                'status' => TaskStatus::Assigned->value,
+                'description' => null,
+                'plan_start_date' => '2026-08-13',
+                'plan_end_date' => '2026-08-15',
+            ])
+            ->assertSessionHasErrors('pic_user_id');
+    }
+
+    public function test_new_tasks_with_pic_are_automatically_assigned(): void
+    {
+        $user = $this->userWithPermissions(['manage_projects', 'manage_tasks']);
+        $project = $this->preparedProject($user);
+        $member = $project->members()->firstOrFail();
+
+        $this->actingAs($user)
+            ->post(route('projects.tasks.bulk-store', $project), [
+                'tasks' => [[
+                    'name' => 'Assigned from bulk create',
+                    'pic_user_id' => $member->user_id,
+                    'description' => 'Has a PIC',
+                    'plan_start_date' => '2026-08-13',
+                    'plan_end_date' => '2026-08-15',
+                ]],
+            ])
+            ->assertRedirect(route('projects.preparation.show', $project));
+
+        $this->assertDatabaseHas('project_tasks', [
+            'project_id' => $project->id,
+            'name' => 'Assigned from bulk create',
+            'status' => TaskStatus::Assigned->value,
+        ]);
+    }
+
+    public function test_planning_project_preparation_can_still_be_updated(): void
+    {
+        $user = $this->userWithPermissions(['manage_projects']);
+        $project = $this->preparedProject($user);
+        $project->forceFill(['status' => ProjectStatus::Planning])->save();
+        $profile = $project->incentiveProfile()->with(['projectRoleRules', 'picLevelRules'])->firstOrFail();
+        $customer = $project->customers()->firstOrFail();
+        $pm = $project->pm()->firstOrFail();
+        $member = $project->members()->firstOrFail();
+        $task = $project->tasks()->firstOrFail();
+
+        $this->actingAs($user)
+            ->post(route('projects.preparation.update', $project), [
+                '_method' => 'PUT',
+                'name' => 'Planning Project Updated',
+                'project_date' => '2026-08-11',
+                'customer_ids' => [$customer->id],
+                'primary_customer_id' => $customer->id,
+                'mandays' => 10,
+                'incentive_profile_id' => $profile->id,
+                'pm_user_id' => $pm->id,
+                'request_user_id' => $user->id,
+                'location' => 'Bandung',
+                'urs_date' => '2026-08-12',
+                'urs_number' => 'URS-UPDATED',
+                'plan_start_date' => '2026-08-13',
+                'plan_end_date' => '2026-08-20',
+                'members' => [[
+                    'user_id' => $member->user_id,
+                    'incentive_project_role_rule_id' => $member->incentive_project_role_rule_id,
+                    'incentive_pic_level_rule_id' => $member->incentive_pic_level_rule_id,
+                    'is_support' => false,
+                ]],
+                'access_rules' => [],
+                'tasks' => [[
+                    'id' => $task->id,
+                    'name' => 'Existing planning task',
+                    'pic_user_id' => $member->user_id,
+                    'status' => TaskStatus::Todo->value,
+                    'description' => 'Existing task with PIC should be assigned when saved from todo.',
+                    'plan_start_date' => '2026-08-13',
+                    'plan_end_date' => '2026-08-15',
+                ], [
+                    'name' => 'New preparation task with PIC',
+                    'pic_user_id' => $member->user_id,
+                    'status' => TaskStatus::Todo->value,
+                    'description' => 'New task with PIC.',
+                    'plan_start_date' => '2026-08-14',
+                    'plan_end_date' => '2026-08-16',
+                ]],
+            ])
+            ->assertRedirect(route('projects.preparation.show', $project))
+            ->assertSessionHasNoErrors();
+
+        $project->refresh();
+        $task->refresh();
+
+        $this->assertSame('Planning Project Updated', $project->name);
+        $this->assertSame('Bandung', $project->location);
+        $this->assertSame('URS-UPDATED', $project->urs_number);
+        $this->assertSame(TaskStatus::Todo, $task->status);
+        $this->assertDatabaseHas('project_tasks', [
+            'project_id' => $project->id,
+            'name' => 'New preparation task with PIC',
+            'status' => TaskStatus::Assigned->value,
+        ]);
     }
 
     /**

@@ -315,6 +315,7 @@ export type TaskBoardProps = {
     };
     options: {
         projects: Array<{ id: number; name: string }>;
+        project_members: Array<{ project_id: number; user_id: number; name: string }>;
         users: UserOption[];
         task_types: Array<{ id: number; project_id?: number | null; name: string; color: string }>;
         statuses: Array<{ value: ProjectTaskStatus; label: string }>;

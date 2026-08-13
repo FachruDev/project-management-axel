@@ -270,6 +270,21 @@ export default function ProjectPreparation({
                 {errors?.project && (
                     <Alert tone="danger">{errors.project}</Alert>
                 )}
+                {errors && Object.keys(errors).length > 0 && (
+                    <Alert tone="danger">
+                        <div className="space-y-1">
+                            <p className="font-bold">Preparation could not be saved.</p>
+                            <ul className="list-disc space-y-1 pl-4">
+                                {Object.entries(errors).map(([field, message]) => (
+                                    <li key={field}>
+                                        <span className="font-semibold">{field}:</span>{' '}
+                                        {message}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </Alert>
+                )}
 
                 <form onSubmit={submit} className="space-y-6">
                     <BasicInformationSection form={form} />

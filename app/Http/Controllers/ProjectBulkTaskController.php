@@ -79,7 +79,7 @@ class ProjectBulkTaskController extends Controller
                     'task_type_id' => $this->validatedTaskTypeId($project, $task['task_type_id'] ?? null),
                     'project_member_id' => $projectMember?->id,
                     'name' => $task['name'],
-                    'status' => TaskStatus::Todo,
+                    'status' => $projectMember instanceof ProjectMember ? TaskStatus::Assigned : TaskStatus::Todo,
                     'description' => $task['description'] ?? null,
                     'plan_start_date' => $task['plan_start_date'],
                     'plan_end_date' => $task['plan_end_date'],

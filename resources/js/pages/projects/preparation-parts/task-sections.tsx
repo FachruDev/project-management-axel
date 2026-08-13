@@ -167,6 +167,11 @@ export function TasksManagementSection({
                                             onTaskChange(indexKey, {
                                                 ...task,
                                                 pic_user_id: event.target.value,
+                                                status:
+                                                    event.target.value !== '' &&
+                                                    task.status === 'todo'
+                                                        ? 'assigned'
+                                                        : task.status,
                                             })
                                         }
                                         className={inputClass}

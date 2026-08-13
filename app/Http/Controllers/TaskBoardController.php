@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\TaskStatus;
 use App\Models\Project;
+use App\Models\ProjectMember;
 use App\Models\ProjectTask;
 use App\Models\TaskType;
 use App\Models\User;
@@ -46,6 +47,10 @@ class TaskBoardController extends Controller
             ->latest('updated_at')
             ->get()
             ->map(fn (ProjectTask $task): array => $this->taskCard($task));
+        $visibleProjects = $this->visibility->visibleProjects(Project::query(), $user)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+        $visibleProjectIds = $visibleProjects->pluck('id');
 
         return Inertia::render('tasks/index', [
             'columns' => collect(TaskStatus::cases())
@@ -63,13 +68,22 @@ class TaskBoardController extends Controller
                 'due' => $due,
             ],
             'options' => [
-                'projects' => $this->visibility->visibleProjects(Project::query(), $user)
-                    ->orderBy('name')
-                    ->get(['id', 'name'])
+                'projects' => $visibleProjects
                     ->map(fn (Project $project): array => [
                         'id' => $project->id,
                         'name' => $project->name,
                     ])
+                    ->all(),
+                'project_members' => ProjectMember::query()
+                    ->with('user')
+                    ->whereIn('project_id', $visibleProjectIds)
+                    ->get()
+                    ->map(fn (ProjectMember $member): array => [
+                        'project_id' => $member->project_id,
+                        'user_id' => $member->user_id,
+                        'name' => $member->user->name,
+                    ])
+                    ->values()
                     ->all(),
                 'users' => User::query()
                     ->where('is_active', true)

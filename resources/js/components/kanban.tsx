@@ -7,6 +7,7 @@ import {
     useSensors,
 } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
+import { GripVertical } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 type KanbanBoardProps = {
@@ -44,7 +45,7 @@ export function KanbanBoard({ children, onDropItem }: KanbanBoardProps) {
         if (!event.over || !onDropItem) {
             return;
         }
-        
+
         onDropItem(String(event.active.id), String(event.over.id));
     }
 
@@ -121,7 +122,6 @@ export function DraggableKanbanCard({
         id,
     });
 
-    // Inject z-index 9999 langsung ke inline style saat isDragging aktif
     const style = transform
         ? {
               transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -134,19 +134,26 @@ export function DraggableKanbanCard({
         <article
             ref={setNodeRef}
             style={style}
-            {...listeners}
-            {...attributes}
-            // Seluruh area card menjadi drag handle
             className={`group relative rounded-xl border bg-white p-3.5 outline-none transition-all duration-200 ${
                 selected ? 'border-primary ring-2 ring-primary/20' : 'border-slate-200/80 hover:border-slate-300'
             } ${
                 isDragging
-                    ? 'scale-[1.02] cursor-grabbing opacity-90 shadow-2xl ring-2 ring-primary/40'
-                    : 'cursor-grab hover:shadow-md'
+                    ? 'scale-[1.02] opacity-90 shadow-2xl ring-2 ring-primary/40'
+                    : 'hover:shadow-md'
             }`}
         >
-            {/* Jira-style visual grab indicator (Garis kecil di tengah atas) */}
-            <div className="absolute left-1/2 top-1.5 h-1 w-8 -translate-x-1/2 rounded-full bg-slate-200 opacity-0 transition-opacity group-hover:opacity-100"></div>
+            <button
+                type="button"
+                title="Drag card"
+                aria-label="Drag card"
+                {...attributes}
+                {...listeners}
+                className={`absolute left-2 top-2 z-20 inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600 focus:bg-slate-100 focus:text-slate-700 focus:outline-none ${
+                    isDragging ? 'cursor-grabbing text-slate-700' : 'cursor-grab'
+                }`}
+            >
+                <GripVertical className="h-4 w-4" />
+            </button>
 
             {children}
         </article>

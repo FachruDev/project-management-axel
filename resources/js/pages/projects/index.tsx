@@ -93,6 +93,7 @@ export default function ProjectIndex({
     const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
     const [moveReason, setMoveReason] = useState('');
     const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
+    const [moveError, setMoveError] = useState<string | null>(null);
 
     const flash = usePage().props.flash as { success?: string | null } | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
@@ -157,6 +158,10 @@ export default function ProjectIndex({
         const previousColumns = boardColumns;
         const previousMetrics = boardMetrics;
 
+        setMoveError(null);
+        setBoardColumns(moveProject(previousColumns, project.id, targetStatus));
+        setBoardMetrics(updateProjectMetrics(previousMetrics, project.status, targetStatus));
+
         router.patch(
             statusMove.url(project.id),
             { target_status: targetStatus, reason },
@@ -164,13 +169,10 @@ export default function ProjectIndex({
                 preserveScroll: true,
                 preserveState: true,
                 only: ['flash'],
-                onBefore: () => {
-                    setBoardColumns(moveProject(previousColumns, project.id, targetStatus));
-                    setBoardMetrics(updateProjectMetrics(previousMetrics, project.status, targetStatus));
-                },
-                onError: () => {
+                onError: (errors) => {
                     setBoardColumns(previousColumns);
                     setBoardMetrics(previousMetrics);
+                    setMoveError(firstError(errors) ?? 'Project status could not be updated.');
                 },
                 onSuccess: () => setPendingMove(null),
             },
@@ -256,6 +258,7 @@ export default function ProjectIndex({
                 {errors?.project && <Alert tone="danger">{errors.project}</Alert>}
                 {errors?.target_status && <Alert tone="danger">{errors.target_status}</Alert>}
                 {errors?.reason && <Alert tone="danger">{errors.reason}</Alert>}
+                {moveError && <Alert tone="danger">{moveError}</Alert>}
 
                 {/* Filter Toolbar Jira Style */}
                 <form
@@ -398,7 +401,7 @@ function ProjectCard({
         <DraggableKanbanCard id={String(project.id)} selected={selected}>
             {/* onPointerDown={(e) => e.stopPropagation()} SANGAT PENTING untuk mencegah event klik tembus memicu fungsi drag dnd-kit */}
 
-            <div className="mt-1 flex items-start justify-between gap-2">
+            <div className="ml-8 mt-1 flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
                     {canManageProjects && (
                         <input
@@ -565,4 +568,8 @@ function updateProjectMetrics(metrics: ProjectIndexProps['metrics'], oldStatus: 
 
 function isBackwardProjectStatus(currentStatus: ProjectStatus, targetStatus: ProjectStatus) {
     return projectStatusRank[targetStatus] < projectStatusRank[currentStatus];
+}
+
+function firstError(errors: Record<string, string>) {
+    return Object.values(errors)[0] ?? null;
 }
