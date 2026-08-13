@@ -24,7 +24,9 @@ export function Panel({
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
                     {Icon && <Icon className="h-4 w-4 text-primary" />}
-                    <h2 className="text-sm font-bold tracking-tight text-slate-900">{title}</h2>
+                    <h2 className="text-sm font-bold tracking-tight text-slate-900">
+                        {title}
+                    </h2>
                 </div>
                 {action}
             </div>
@@ -47,8 +49,10 @@ export function LockedSection({
                     <LockKeyhole className="h-4 w-4" />
                 </div>
                 <div>
-                    <div className="text-sm font-bold text-slate-800">{title}</div>
-                    <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+                    <div className="text-sm font-bold text-slate-800">
+                        {title}
+                    </div>
+                    <p className="mt-1 text-xs leading-5 font-medium text-slate-500">
                         {description}
                     </p>
                 </div>
@@ -62,14 +66,16 @@ export function Field({
     error,
     children,
     required = false,
+    wrapper = 'label',
 }: {
     label: string;
     error?: string;
     children: ReactNode;
     required?: boolean;
+    wrapper?: 'label' | 'div';
 }) {
-    return (
-        <label className="flex flex-col gap-1.5">
+    const content = (
+        <>
             <span className="text-xs font-bold text-slate-700">
                 {label}
                 {required && <span className="text-red-500"> *</span>}
@@ -81,8 +87,14 @@ export function Field({
                     {error}
                 </span>
             )}
-        </label>
+        </>
     );
+
+    if (wrapper === 'div') {
+        return <div className="flex flex-col gap-1.5">{content}</div>;
+    }
+
+    return <label className="flex flex-col gap-1.5">{content}</label>;
 }
 
 export function Alert({

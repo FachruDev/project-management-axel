@@ -1,6 +1,10 @@
 import type { InertiaFormProps } from '@inertiajs/react';
 
-import type { PreparationAccessRule, PreparationMember, PreparationTask } from '@/types';
+import type {
+    PreparationAccessRule,
+    PreparationMember,
+    PreparationTask,
+} from '@/types';
 
 export type PreparationPayload = {
     name: string;

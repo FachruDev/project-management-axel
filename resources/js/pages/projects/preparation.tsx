@@ -4,7 +4,10 @@ import type { FormEvent } from 'react';
 import { useState } from 'react';
 
 import { create as createProjectTasks } from '@/actions/App/Http/Controllers/ProjectBulkTaskController';
-import { index as projectIndex, show as projectShow } from '@/actions/App/Http/Controllers/ProjectController';
+import {
+    index as projectIndex,
+    show as projectShow,
+} from '@/actions/App/Http/Controllers/ProjectController';
 import { update } from '@/actions/App/Http/Controllers/ProjectPreparationController';
 import deleteTask from '@/actions/App/Http/Controllers/ProjectTaskDeleteController';
 import {
@@ -48,17 +51,22 @@ export default function ProjectPreparation({
     project,
     options,
 }: ProjectPreparationProps) {
-    const flash = usePage().props.flash as { success?: string | null } | undefined;
+    const flash = usePage().props.flash as
+        { success?: string | null } | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
     const [taskTypeModalOpen, setTaskTypeModalOpen] = useState(false);
-    const [editingTaskType, setEditingTaskType] = useState<ProjectTaskTypeOption | null>(null);
+    const [editingTaskType, setEditingTaskType] =
+        useState<ProjectTaskTypeOption | null>(null);
 
     const form = useForm<PreparationPayload>({
         name: project.name,
         project_date: project.project_date,
         customer_ids: project.customers.map((customer) => String(customer.id)),
-        primary_customer_id:
-            String(project.customers.find((customer) => customer.is_primary)?.id ?? project.customers[0]?.id ?? ''),
+        primary_customer_id: String(
+            project.customers.find((customer) => customer.is_primary)?.id ??
+                project.customers[0]?.id ??
+                '',
+        ),
         mandays: project.mandays,
         incentive_profile_id: String(project.incentive_profile_id ?? ''),
         pm_user_id: String(project.pm_user_id ?? ''),
@@ -79,9 +87,13 @@ export default function ProjectPreparation({
                 ? project.members.map((member) => ({
                       ...member,
                       user_id: String(member.user_id),
-                      incentive_project_role_rule_id: String(member.incentive_project_role_rule_id),
+                      incentive_project_role_rule_id: String(
+                          member.incentive_project_role_rule_id,
+                      ),
                       incentive_pic_level_rule_id:
-                          member.incentive_pic_level_rule_id === null ? '' : String(member.incentive_pic_level_rule_id),
+                          member.incentive_pic_level_rule_id === null
+                              ? ''
+                              : String(member.incentive_pic_level_rule_id),
                   }))
                 : [blankMember()],
         access_rules: project.access_rules.map((rule) => ({
@@ -90,16 +102,27 @@ export default function ProjectPreparation({
         })),
         tasks: project.tasks.map((task) => ({
             ...task,
-            task_type_id: task.task_type_id === null ? '' : String(task.task_type_id),
-            pic_user_id: task.pic_user_id === null ? '' : String(task.pic_user_id),
+            task_type_id:
+                task.task_type_id === null ? '' : String(task.task_type_id),
+            pic_user_id:
+                task.pic_user_id === null ? '' : String(task.pic_user_id),
             attachments: [],
         })),
     });
 
     const taskTypeForm = useForm<TaskTypePayload>(blankTaskType);
 
-    const showUat = ['planning', 'ongoing', 'awaiting_bast', 'ready_to_close', 'closed'].includes(project.status) || Boolean(form.data.uat_date);
-    const showBast = Boolean(form.data.uat_date) || Boolean(project.attachments.uat_file?.length);
+    const showUat =
+        [
+            'planning',
+            'ongoing',
+            'awaiting_bast',
+            'ready_to_close',
+            'closed',
+        ].includes(project.status) || Boolean(form.data.uat_date);
+    const showBast =
+        Boolean(form.data.uat_date) ||
+        Boolean(project.attachments.uat_file?.length);
 
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -121,15 +144,28 @@ export default function ProjectPreparation({
     }
 
     function setMember(index: number, value: PreparationMember) {
-        form.setData('members', form.data.members.map((member, i) => (i === index ? value : member)));
+        form.setData(
+            'members',
+            form.data.members.map((member, i) =>
+                i === index ? value : member,
+            ),
+        );
     }
 
     function setAccessRule(index: number, value: PreparationAccessRule) {
-        form.setData('access_rules', form.data.access_rules.map((rule, i) => (i === index ? value : rule)));
+        form.setData(
+            'access_rules',
+            form.data.access_rules.map((rule, i) =>
+                i === index ? value : rule,
+            ),
+        );
     }
 
     function setTask(index: number, value: PreparationTask) {
-        form.setData('tasks', form.data.tasks.map((task, i) => (i === index ? value : task)));
+        form.setData(
+            'tasks',
+            form.data.tasks.map((task, i) => (i === index ? value : task)),
+        );
     }
 
     function addTask() {
@@ -157,8 +193,14 @@ export default function ProjectPreparation({
 
         if (editingTaskType) {
             taskTypeForm.patch(
-                updateTaskType.url({ project: project.id, taskType: editingTaskType.id }),
-                { preserveScroll: true, onSuccess: () => setTaskTypeModalOpen(false) },
+                updateTaskType.url({
+                    project: project.id,
+                    taskType: editingTaskType.id,
+                }),
+                {
+                    preserveScroll: true,
+                    onSuccess: () => setTaskTypeModalOpen(false),
+                },
             );
 
             return;
@@ -171,12 +213,18 @@ export default function ProjectPreparation({
     }
 
     function removeTaskType(taskType: ProjectTaskTypeOption) {
-        router.delete(destroyTaskType.url({ project: project.id, taskType: taskType.id }), { preserveScroll: true });
+        router.delete(
+            destroyTaskType.url({ project: project.id, taskType: taskType.id }),
+            { preserveScroll: true },
+        );
     }
 
     function removeTask(task: PreparationTask) {
         if (!task.id) {
-            form.setData('tasks', form.data.tasks.filter((item) => item !== task));
+            form.setData(
+                'tasks',
+                form.data.tasks.filter((item) => item !== task),
+            );
 
             return;
         }
@@ -216,8 +264,12 @@ export default function ProjectPreparation({
                     }
                 />
 
-                {flash?.success && <Alert tone="success">{flash.success}</Alert>}
-                {errors?.project && <Alert tone="danger">{errors.project}</Alert>}
+                {flash?.success && (
+                    <Alert tone="success">{flash.success}</Alert>
+                )}
+                {errors?.project && (
+                    <Alert tone="danger">{errors.project}</Alert>
+                )}
 
                 <form onSubmit={submit} className="space-y-6">
                     <BasicInformationSection form={form} />
@@ -236,7 +288,12 @@ export default function ProjectPreparation({
                         form={form}
                         options={options}
                         onMemberChange={setMember}
-                        onAddMember={() => form.setData('members', [...form.data.members, blankMember()])}
+                        onAddMember={() =>
+                            form.setData('members', [
+                                ...form.data.members,
+                                blankMember(),
+                            ])
+                        }
                     />
                     <AccessRulesSection
                         form={form}

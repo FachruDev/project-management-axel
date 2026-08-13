@@ -33,7 +33,7 @@ export function TaskTypeModal({
         >
             {!editingTaskType && (
                 <div className="mb-5 space-y-2 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <div className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
                         Existing Types
                     </div>
                     <div className="grid max-h-48 gap-2 overflow-y-auto">
@@ -46,13 +46,15 @@ export function TaskTypeModal({
                                     <div className="flex items-center gap-2">
                                         <span
                                             className="h-2.5 w-2.5 rounded-full"
-                                            style={{ backgroundColor: type.color }}
+                                            style={{
+                                                backgroundColor: type.color,
+                                            }}
                                         />
                                         <span className="truncate font-bold text-slate-800">
                                             {type.name}
                                         </span>
                                         {type.is_global && (
-                                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-slate-400">
+                                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-400 uppercase">
                                                 Global
                                             </span>
                                         )}
@@ -94,21 +96,31 @@ export function TaskTypeModal({
                     <input
                         placeholder="e.g. Bug, Feature, Review"
                         value={form.data.name}
-                        onChange={(event) => form.setData('name', event.target.value)}
+                        onChange={(event) =>
+                            form.setData('name', event.target.value)
+                        }
                         className={inputClass}
                     />
                 </Field>
-                <Field label="Indicator Color" error={form.errors.color} required>
+                <Field
+                    label="Indicator Color"
+                    error={form.errors.color}
+                    required
+                >
                     <div className="flex gap-2">
                         <input
                             type="color"
                             value={form.data.color}
-                            onChange={(event) => form.setData('color', event.target.value)}
+                            onChange={(event) =>
+                                form.setData('color', event.target.value)
+                            }
                             className="h-9 w-14 cursor-pointer rounded-lg border border-slate-200 shadow-sm"
                         />
                         <input
                             value={form.data.color}
-                            onChange={(event) => form.setData('color', event.target.value)}
+                            onChange={(event) =>
+                                form.setData('color', event.target.value)
+                            }
                             className={inputClass}
                         />
                     </div>
@@ -117,7 +129,9 @@ export function TaskTypeModal({
                     <textarea
                         placeholder="Optional notes"
                         value={form.data.description}
-                        onChange={(event) => form.setData('description', event.target.value)}
+                        onChange={(event) =>
+                            form.setData('description', event.target.value)
+                        }
                         className={`${inputClass} min-h-[80px] resize-y py-2`}
                     />
                 </Field>
@@ -125,7 +139,9 @@ export function TaskTypeModal({
                     <input
                         type="checkbox"
                         checked={form.data.is_active}
-                        onChange={(event) => form.setData('is_active', event.target.checked)}
+                        onChange={(event) =>
+                            form.setData('is_active', event.target.checked)
+                        }
                         className="h-4 w-4 rounded-sm border-slate-300 text-primary focus:ring-primary/20"
                     />
                     Active Status <span className="text-red-500">*</span>
