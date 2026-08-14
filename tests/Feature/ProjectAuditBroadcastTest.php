@@ -124,7 +124,7 @@ class ProjectAuditBroadcastTest extends TestCase
 
         $this->actingAs($user)
             ->patch(route('tasks.status.update', $task), [
-                'status' => TaskStatus::Todo->value,
+                'status' => TaskStatus::Cancelled->value,
                 'reason' => 'Invalid move.',
             ])
             ->assertSessionHasErrors('status');

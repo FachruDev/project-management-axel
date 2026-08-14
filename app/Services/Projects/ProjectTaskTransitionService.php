@@ -19,11 +19,11 @@ class ProjectTaskTransitionService
     /**
      * @var array<string, array<int, TaskStatus>>
      */
-    private array $allowedTransitions = [
+    private array $forwardTransitions = [
         'todo' => [TaskStatus::Assigned, TaskStatus::Cancelled],
-        'assigned' => [TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Cancelled],
-        'inprogress' => [TaskStatus::Assigned, TaskStatus::Done, TaskStatus::Cancelled],
-        'done' => [TaskStatus::InProgress],
+        'assigned' => [TaskStatus::InProgress, TaskStatus::Cancelled],
+        'inprogress' => [TaskStatus::Done, TaskStatus::Cancelled],
+        'done' => [],
         'cancelled' => [],
     ];
 
@@ -35,7 +35,7 @@ class ProjectTaskTransitionService
             return $task;
         }
 
-        if (! in_array($targetStatus, $this->allowedTransitions[$currentStatus->value] ?? [], true)) {
+        if (! in_array($targetStatus, $this->allowedTargetsForStatus($currentStatus), true)) {
             throw ValidationException::withMessages([
                 'status' => ['Task status transition is not allowed.'],
             ]);
@@ -91,7 +91,20 @@ class ProjectTaskTransitionService
      */
     public function allowedTargets(ProjectTask $task): array
     {
-        return $this->allowedTransitions[$this->currentStatus($task)->value] ?? [];
+        return $this->allowedTargetsForStatus($this->currentStatus($task));
+    }
+
+    /**
+     * @return array<int, TaskStatus>
+     */
+    private function allowedTargetsForStatus(TaskStatus $currentStatus): array
+    {
+        return collect(TaskStatus::cases())
+            ->filter(fn (TaskStatus $status): bool => $this->isBackward($currentStatus, $status))
+            ->merge($this->forwardTransitions[$currentStatus->value] ?? [])
+            ->unique(fn (TaskStatus $status): string => $status->value)
+            ->values()
+            ->all();
     }
 
     private function currentStatus(ProjectTask $task): TaskStatus

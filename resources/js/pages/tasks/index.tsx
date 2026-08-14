@@ -71,6 +71,8 @@ type TaskFormPayload = {
     reason: string;
 };
 
+const taskStatuses: ProjectTaskStatus[] = ['todo', 'assigned', 'inprogress', 'done', 'cancelled'];
+
 const taskStatusRank: Record<ProjectTaskStatus, number> = {
     todo: 1,
     assigned: 2,
@@ -81,9 +83,9 @@ const taskStatusRank: Record<ProjectTaskStatus, number> = {
 
 const taskForwardTargets: Record<ProjectTaskStatus, ProjectTaskStatus[]> = {
     todo: ['assigned', 'cancelled'],
-    assigned: ['todo', 'inprogress', 'cancelled'],
-    inprogress: ['assigned', 'done', 'cancelled'],
-    done: ['inprogress'],
+    assigned: ['inprogress', 'cancelled'],
+    inprogress: ['done', 'cancelled'],
+    done: [],
     cancelled: [],
 };
 
@@ -925,7 +927,8 @@ function isBackwardTaskStatus(currentStatus: ProjectTaskStatus, targetStatus: Pr
 }
 
 function taskAllowedStatuses(status: ProjectTaskStatus) {
-    return taskForwardTargets[status];
+    return taskStatuses.filter((targetStatus) => isBackwardTaskStatus(status, targetStatus))
+        .concat(taskForwardTargets[status]);
 }
 
 function firstError(errors: Record<string, string>) {

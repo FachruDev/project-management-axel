@@ -654,13 +654,18 @@ class ProjectPageWorkflowTest extends TestCase
         $this->actingAs($user)
             ->patch(route('tasks.status.update', $task), [
                 'status' => TaskStatus::Todo->value,
+                'reason' => 'Reset to todo.',
             ])
-            ->assertSessionHasErrors('status');
+            ->assertSessionHasNoErrors();
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::Todo, $task->status);
+        $this->assertNull($task->actual_start_date);
 
         $this->actingAs($user)
             ->patch(route('tasks.status.update', $task), [
                 'status' => TaskStatus::Assigned->value,
-                'reason' => 'Need more details.',
             ])
             ->assertSessionHasNoErrors();
 
@@ -668,6 +673,31 @@ class ProjectPageWorkflowTest extends TestCase
 
         $this->assertSame(TaskStatus::Assigned, $task->status);
         $this->assertNull($task->actual_start_date);
+
+        $this->actingAs($user)
+            ->patch(route('tasks.status.update', $task), [
+                'status' => TaskStatus::InProgress->value,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($user)
+            ->patch(route('tasks.status.update', $task->refresh()), [
+                'status' => TaskStatus::Done->value,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($user)
+            ->patch(route('tasks.status.update', $task->refresh()), [
+                'status' => TaskStatus::Todo->value,
+                'reason' => 'Restart from todo.',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $task->refresh();
+
+        $this->assertSame(TaskStatus::Todo, $task->status);
+        $this->assertNull($task->actual_start_date);
+        $this->assertNull($task->actual_end_date);
     }
 
     public function test_task_can_be_updated_from_drawer_with_status_transition(): void
