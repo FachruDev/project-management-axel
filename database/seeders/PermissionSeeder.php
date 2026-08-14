@@ -20,6 +20,8 @@ class PermissionSeeder extends Seeder
                 'manage_incentive_profiles',
                 'calculate_project_incentives',
                 'view_project_incentives',
+                'lock_project_incentives',
+                'unlock_project_incentives',
             ],
             'project' => [
                 'manage_projects',

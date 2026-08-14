@@ -11,6 +11,7 @@ use App\Http\Controllers\IncentiveProfileController;
 use App\Http\Controllers\ProjectApprovalController;
 use App\Http\Controllers\ProjectBulkDeleteController;
 use App\Http\Controllers\ProjectBulkTaskController;
+use App\Http\Controllers\ProjectCalculationController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectPreparationController;
 use App\Http\Controllers\ProjectPreparationExcelController;
@@ -170,6 +171,22 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::post('incentive-profiles/{incentive_profile}/calculations', [IncentiveProfileController::class, 'calculateProjects'])
         ->middleware('can:calculate_project_incentives')
         ->name('incentive-profiles.calculations.store');
+
+    Route::get('project-calculations', [ProjectCalculationController::class, 'index'])
+        ->middleware('can:view_project_incentives')
+        ->name('project-calculations.index');
+    Route::post('project-calculations/profiles/{incentive_profile}/recalculate', [ProjectCalculationController::class, 'recalculate'])
+        ->middleware('can:calculate_project_incentives')
+        ->name('project-calculations.recalculate');
+    Route::get('project-calculations/{project_incentive_calculation}', [ProjectCalculationController::class, 'show'])
+        ->middleware('can:view_project_incentives')
+        ->name('project-calculations.show');
+    Route::patch('project-calculations/{project_incentive_calculation}/lock', [ProjectCalculationController::class, 'lock'])
+        ->middleware('can:lock_project_incentives')
+        ->name('project-calculations.lock');
+    Route::patch('project-calculations/{project_incentive_calculation}/unlock', [ProjectCalculationController::class, 'unlock'])
+        ->middleware('can:unlock_project_incentives')
+        ->name('project-calculations.unlock');
 
     Route::middleware('can:manage_incentive_profiles')->group(function (): void {
         Route::patch('incentive-profiles/{incentive_profile}/status', [IncentiveProfileController::class, 'updateStatus'])

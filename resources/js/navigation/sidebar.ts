@@ -2,6 +2,7 @@ import {
     LayoutDashboard,
     FolderKanban,
     FileSpreadsheet,
+    Calculator,
     CheckCircle2,
     CheckSquare,
     CircleDollarSign,
@@ -19,6 +20,7 @@ import { index as departmentsIndex } from '@/actions/App/Http/Controllers/Depart
 import { index as holidaysIndex } from '@/actions/App/Http/Controllers/HolidayController';
 import { index as incentiveProfilesIndex } from '@/actions/App/Http/Controllers/IncentiveProfileController';
 import { index as projectApprovalsIndex } from '@/actions/App/Http/Controllers/ProjectApprovalController';
+import { index as projectCalculationsIndex } from '@/actions/App/Http/Controllers/ProjectCalculationController';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/ProjectController';
 import projectPreparationsIndex from '@/actions/App/Http/Controllers/ProjectPreparationIndexController';
 import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
@@ -66,6 +68,14 @@ export const sidebarItems: SidebarItem[] = [
         icon: CheckCircle2,
         href: projectApprovalsIndex.url(),
         permission: 'approve_projects',
+        status: 'ready',
+    },
+    {
+        label: 'Project Calculations',
+        section: 'Project',
+        icon: Calculator,
+        href: projectCalculationsIndex.url(),
+        permission: 'view_project_incentives',
         status: 'ready',
     },
     {

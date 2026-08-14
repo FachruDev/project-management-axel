@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 #[Fillable([
@@ -196,6 +197,16 @@ class Project extends Model
     public function incentiveCalculations(): HasMany
     {
         return $this->hasMany(ProjectIncentiveCalculation::class);
+    }
+
+    /**
+     * @return HasOne<ProjectIncentiveCalculation, $this>
+     */
+    public function currentIncentiveCalculation(): HasOne
+    {
+        return $this->hasOne(ProjectIncentiveCalculation::class)
+            ->where('is_current', true)
+            ->latestOfMany('calculated_at');
     }
 
     public function hasAttachment(AttachmentCollection $collection): bool

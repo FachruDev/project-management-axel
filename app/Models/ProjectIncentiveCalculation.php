@@ -25,6 +25,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'delivery_multiplier',
     'total_incentive',
     'calculated_at',
+    'calculated_by',
+    'is_current',
+    'locked_at',
+    'locked_by',
+    'lock_notes',
 ])]
 class ProjectIncentiveCalculation extends Model
 {
@@ -48,6 +53,8 @@ class ProjectIncentiveCalculation extends Model
             'delivery_multiplier' => 'decimal:4',
             'total_incentive' => 'decimal:4',
             'calculated_at' => 'datetime',
+            'is_current' => 'boolean',
+            'locked_at' => 'datetime',
         ];
     }
 
@@ -68,10 +75,31 @@ class ProjectIncentiveCalculation extends Model
     }
 
     /**
+     * @return BelongsTo<User, $this>
+     */
+    public function calculatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'calculated_by');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function lockedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'locked_by');
+    }
+
+    /**
      * @return HasMany<ProjectIncentiveItem, $this>
      */
     public function items(): HasMany
     {
         return $this->hasMany(ProjectIncentiveItem::class, 'calculation_id');
+    }
+
+    public function isLocked(): bool
+    {
+        return $this->locked_at !== null;
     }
 }

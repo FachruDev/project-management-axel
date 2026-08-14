@@ -13,6 +13,7 @@ use App\Models\IncentiveProjectRoleRule;
 use App\Models\Project;
 use App\Models\ProjectIncentiveCalculation;
 use App\Models\ProjectMember;
+use App\Models\User;
 use App\Services\Calendar\BusinessDayCalculator;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -42,9 +43,9 @@ class ProjectIncentiveCalculator
     /**
      * @throws ValidationException
      */
-    public function calculate(Project $project): ProjectIncentiveCalculation
+    public function calculate(Project $project, ?User $actor = null): ProjectIncentiveCalculation
     {
-        return DB::transaction(function () use ($project): ProjectIncentiveCalculation {
+        return DB::transaction(function () use ($project, $actor): ProjectIncentiveCalculation {
             $project = $project->fresh([
                 'incentiveProfile.mandayRules',
                 'incentiveProfile.deliveryRules',
@@ -55,6 +56,7 @@ class ProjectIncentiveCalculator
 
             $profile = $this->validatedProfile($project);
             $this->ensureClosedProject($project);
+            $this->ensureUnlockedCurrentCalculation($project);
 
             $mandays = (float) $project->mandays;
             $mandayRule = $this->matchingMandayRule($profile, $mandays);
@@ -109,12 +111,35 @@ class ProjectIncentiveCalculator
                 'delivery_multiplier' => $this->roundValue($deliveryMultiplier),
                 'total_incentive' => $this->roundValue((float) $rows->sum('final_incentive')),
                 'calculated_at' => now(),
+                'calculated_by' => $actor?->id,
+                'is_current' => true,
             ]);
 
             $calculation->items()->createMany($rows->all());
 
             return $calculation->refresh()->load('items');
         });
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function ensureUnlockedCurrentCalculation(Project $project): void
+    {
+        $currentCalculations = ProjectIncentiveCalculation::query()
+            ->whereBelongsTo($project)
+            ->where('is_current', true)
+            ->lockForUpdate()
+            ->get();
+
+        if ($currentCalculations->contains(fn (ProjectIncentiveCalculation $calculation): bool => $calculation->isLocked())) {
+            $this->fail('calculation', 'Project calculation is locked and cannot be recalculated.');
+        }
+
+        ProjectIncentiveCalculation::query()
+            ->whereBelongsTo($project)
+            ->where('is_current', true)
+            ->update(['is_current' => false]);
     }
 
     /**

@@ -134,9 +134,9 @@ class IncentiveProfileController extends Controller
             ->with('success', 'New incentive profile version created.');
     }
 
-    public function calculateProjects(IncentiveProfile $incentiveProfile): RedirectResponse
+    public function calculateProjects(Request $request, IncentiveProfile $incentiveProfile): RedirectResponse
     {
-        $summary = $this->batchCalculator->calculateForProfile($incentiveProfile);
+        $summary = $this->batchCalculator->calculateForProfile($incentiveProfile, $this->actor($request));
 
         return redirect()
             ->route('incentive-profiles.show', $incentiveProfile)

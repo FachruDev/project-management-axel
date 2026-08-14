@@ -30,6 +30,25 @@ class ProjectIncentiveCalculationFactory extends Factory
             'delivery_multiplier' => 1,
             'total_incentive' => 20,
             'calculated_at' => now(),
+            'calculated_by' => null,
+            'is_current' => true,
+            'locked_at' => null,
+            'locked_by' => null,
+            'lock_notes' => null,
         ];
+    }
+
+    public function locked(): static
+    {
+        return $this->state(fn (): array => [
+            'locked_at' => now(),
+        ]);
+    }
+
+    public function historical(): static
+    {
+        return $this->state(fn (): array => [
+            'is_current' => false,
+        ]);
     }
 }
