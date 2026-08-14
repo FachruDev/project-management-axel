@@ -11,6 +11,7 @@ use App\Models\ProjectTask;
 use App\Models\TaskType;
 use App\Models\User;
 use App\Services\Projects\ProjectAuditLogger;
+use App\Services\Projects\ProjectTaskActualDateService;
 use App\Services\Projects\ProjectTaskTransitionService;
 use App\Services\Projects\ProjectVisibilityService;
 use DateTimeInterface;
@@ -22,6 +23,7 @@ class ProjectTaskController extends Controller
 {
     public function __construct(
         private readonly ProjectAuditLogger $auditLogger,
+        private readonly ProjectTaskActualDateService $actualDateService,
         private readonly ProjectTaskTransitionService $transitionService,
         private readonly ProjectVisibilityService $visibility,
     ) {}
@@ -40,6 +42,7 @@ class ProjectTaskController extends Controller
             $targetStatus = TaskStatus::from((string) $validated['status']);
             $currentStatus = $this->taskStatus($task);
             $oldData = $this->taskSnapshot($task);
+            $actualDateOverrides = $this->actualDateOverrides($validated, $actor);
 
             $task->forceFill([
                 'task_type_id' => $this->validatedTaskTypeId($project, $validated['task_type_id'] ?? null),
@@ -49,6 +52,10 @@ class ProjectTaskController extends Controller
                 'plan_start_date' => $validated['plan_start_date'],
                 'plan_end_date' => $validated['plan_end_date'],
             ]);
+
+            if ($currentStatus === $targetStatus && $actualDateOverrides !== []) {
+                $task->forceFill($this->actualDateService->forStatus($task, $targetStatus, $actualDateOverrides));
+            }
 
             if ($task->isDirty()) {
                 $task->save();
@@ -71,6 +78,7 @@ class ProjectTaskController extends Controller
                     $targetStatus,
                     $actor,
                     $validated['reason'] ?? null,
+                    $actualDateOverrides,
                 );
             }
 
@@ -225,5 +233,26 @@ class ProjectTaskController extends Controller
         }
 
         return $value === null ? null : (string) $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function actualDateOverrides(array $data, User $actor): array
+    {
+        if (! $actor->can('override_actual_dates')) {
+            return [];
+        }
+
+        $overrides = [];
+
+        foreach (['actual_start_date', 'actual_end_date'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $overrides[$field] = $this->dateString($data[$field]);
+            }
+        }
+
+        return $overrides;
     }
 }

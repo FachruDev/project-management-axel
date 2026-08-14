@@ -374,6 +374,7 @@ class ProjectPageWorkflowTest extends TestCase
         $project->refresh();
 
         $this->assertSame(ProjectStatus::Ongoing, $project->status);
+        $this->assertNotNull($project->actual_start_date);
         $this->assertDatabaseHas('project_status_histories', [
             'project_id' => $project->id,
             'from_status' => ProjectStatus::Planning->value,
@@ -754,6 +755,66 @@ class ProjectPageWorkflowTest extends TestCase
         $this->assertSame('Edited Rollback Task', $task->name);
         $this->assertSame(TaskStatus::Assigned, $task->status);
         $this->assertNull($task->actual_start_date);
+    }
+
+    public function test_task_actual_dates_can_only_be_overridden_with_permission(): void
+    {
+        $user = $this->userWithPermissions(['manage_tasks']);
+        $privilegedUser = $this->userWithPermissions(['manage_tasks', 'override_actual_dates']);
+        $project = Project::factory()->create(['status' => ProjectStatus::Ongoing]);
+        $member = ProjectMember::factory()->create([
+            'project_id' => $project->id,
+            'user_id' => $privilegedUser->id,
+        ]);
+        ProjectMember::factory()->create([
+            'project_id' => $project->id,
+            'user_id' => $user->id,
+        ]);
+        $task = $project->tasks()->create([
+            'project_member_id' => $member->id,
+            'name' => 'Actual Override Task',
+            'status' => TaskStatus::Done,
+            'plan_start_date' => '2026-08-13',
+            'plan_end_date' => '2026-08-15',
+            'actual_start_date' => '2026-08-14',
+            'actual_end_date' => '2026-08-16',
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('tasks.update', $task), [
+                'name' => 'Unauthorized Actual Override',
+                'task_type_id' => null,
+                'pic_user_id' => $member->user_id,
+                'status' => TaskStatus::Done->value,
+                'description' => null,
+                'plan_start_date' => '2026-08-13',
+                'plan_end_date' => '2026-08-15',
+                'actual_start_date' => '2026-08-01',
+                'actual_end_date' => '2026-08-02',
+            ])
+            ->assertSessionHasErrors(['actual_start_date', 'actual_end_date']);
+
+        $task->refresh();
+        $this->assertSame('2026-08-14', $task->actual_start_date?->toDateString());
+        $this->assertSame('2026-08-16', $task->actual_end_date?->toDateString());
+
+        $this->actingAs($privilegedUser)
+            ->patch(route('tasks.update', $task), [
+                'name' => 'Authorized Actual Override',
+                'task_type_id' => null,
+                'pic_user_id' => $member->user_id,
+                'status' => TaskStatus::Done->value,
+                'description' => null,
+                'plan_start_date' => '2026-08-13',
+                'plan_end_date' => '2026-08-15',
+                'actual_start_date' => '2026-08-01',
+                'actual_end_date' => '2026-08-02',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $task->refresh();
+        $this->assertSame('2026-08-01', $task->actual_start_date?->toDateString());
+        $this->assertSame('2026-08-02', $task->actual_end_date?->toDateString());
     }
 
     public function test_task_update_rejects_pic_outside_project_members(): void

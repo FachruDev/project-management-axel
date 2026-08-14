@@ -68,6 +68,8 @@ type TaskFormPayload = {
     description: string;
     plan_start_date: string;
     plan_end_date: string;
+    actual_start_date: string;
+    actual_end_date: string;
     reason: string;
 };
 
@@ -106,6 +108,7 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
     const errors = usePage().props.errors as Record<string, string> | undefined;
     const { auth } = usePage().props as unknown as { auth: Auth };
     const canManageTasks = auth.user?.permissions.includes('manage_tasks') ?? false;
+    const canOverrideActualDates = auth.user?.permissions.includes('override_actual_dates') ?? false;
 
     useEffect(() => {
         setBoardColumns(columns);
@@ -403,6 +406,7 @@ export default function TaskBoard({ columns, filters, options }: TaskBoardProps)
                         <TaskDetailPanel
                             task={detailTask}
                             canManageTasks={canManageTasks}
+                            canOverrideActualDates={canOverrideActualDates}
                             options={options}
                             onUpdated={updateBoardTask}
                         />
@@ -539,11 +543,13 @@ function TaskCard({
 function TaskDetailPanel({
     task,
     canManageTasks,
+    canOverrideActualDates,
     options,
     onUpdated,
 }: {
     task: TaskKanbanCard;
     canManageTasks: boolean;
+    canOverrideActualDates: boolean;
     options: TaskBoardProps['options'];
     onUpdated: (task: TaskKanbanCard) => void;
 }) {
@@ -566,12 +572,23 @@ function TaskDetailPanel({
         const nextTask: TaskKanbanCard = normalizeEditedTask(task, {
             ...form.data,
             reason: isBackwardMove ? form.data.reason : '',
-        }, selectedTaskType ?? null, selectedPic);
+        }, selectedTaskType ?? null, selectedPic, canOverrideActualDates);
 
-        form.transform((data) => ({
-            ...data,
-            reason: isBackwardMove ? data.reason : '',
-        }));
+        form.transform((data) => {
+            const payload: Partial<TaskFormPayload> = {
+                ...data,
+                reason: isBackwardMove ? data.reason : '',
+            };
+
+            if (canOverrideActualDates) {
+                return payload;
+            }
+
+            delete payload.actual_start_date;
+            delete payload.actual_end_date;
+
+            return payload;
+        });
         form.patch(updateTask.url(task.id), {
             preserveScroll: true,
             preserveState: true,
@@ -705,6 +722,32 @@ function TaskDetailPanel({
                                 {form.errors.plan_end_date && <span className="text-[11px] text-red-600">{form.errors.plan_end_date}</span>}
                             </label>
                         </div>
+
+                        {canOverrideActualDates && (
+                            <div className="grid grid-cols-1 gap-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3 md:grid-cols-2">
+                                <label className="grid gap-1 text-xs font-semibold text-slate-700">
+                                    Actual Start
+                                    <input
+                                        type="date"
+                                        value={form.data.actual_start_date}
+                                        onChange={(event) => form.setData('actual_start_date', event.target.value)}
+                                        className={inputClass}
+                                    />
+                                    {form.errors.actual_start_date && <span className="text-[11px] text-red-600">{form.errors.actual_start_date}</span>}
+                                </label>
+
+                                <label className="grid gap-1 text-xs font-semibold text-slate-700">
+                                    Actual End
+                                    <input
+                                        type="date"
+                                        value={form.data.actual_end_date}
+                                        onChange={(event) => form.setData('actual_end_date', event.target.value)}
+                                        className={inputClass}
+                                    />
+                                    {form.errors.actual_end_date && <span className="text-[11px] text-red-600">{form.errors.actual_end_date}</span>}
+                                </label>
+                            </div>
+                        )}
                     </div>
 
                     <DetailGrid
@@ -790,6 +833,8 @@ function taskFormPayload(task: TaskKanbanCard): TaskFormPayload {
         description: task.description ?? '',
         plan_start_date: task.plan_start_date ?? '',
         plan_end_date: task.plan_end_date ?? '',
+        actual_start_date: task.actual_start_date ?? '',
+        actual_end_date: task.actual_end_date ?? '',
         reason: '',
     };
 }
@@ -799,6 +844,7 @@ function normalizeEditedTask(
     data: TaskFormPayload,
     taskType: TaskBoardProps['options']['task_types'][number] | null,
     pic: TaskKanbanCard['pic'],
+    canOverrideActualDates: boolean,
 ): TaskKanbanCard {
     return {
         ...task,
@@ -807,8 +853,12 @@ function normalizeEditedTask(
         description: data.description || null,
         plan_start_date: data.plan_start_date || null,
         plan_end_date: data.plan_end_date || null,
-        actual_start_date: optimisticActualStartDate(task, data.status),
-        actual_end_date: optimisticActualEndDate(task, data.status),
+        actual_start_date: canOverrideActualDates
+            ? data.actual_start_date || null
+            : optimisticActualStartDate(task, data.status),
+        actual_end_date: canOverrideActualDates
+            ? data.actual_end_date || null
+            : optimisticActualEndDate(task, data.status),
         pic,
         task_type: taskType
             ? {

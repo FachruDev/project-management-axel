@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Http\Requests\Concerns\NormalizesNumericInput;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class UpdateProjectPreparationRequest extends FormRequest
 {
@@ -38,6 +39,8 @@ class UpdateProjectPreparationRequest extends FormRequest
             'request_evidence.*' => ['file', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'max:10240'],
             'plan_start_date' => ['required', 'date'],
             'plan_end_date' => ['required', 'date', 'after_or_equal:plan_start_date'],
+            'actual_start_date' => ['nullable', 'date'],
+            'actual_end_date' => ['nullable', 'date', 'after_or_equal:actual_start_date'],
             'uat_date' => ['nullable', 'date'],
             'uat_file' => ['nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'max:10240'],
             'bast_date' => ['nullable', 'date'],
@@ -59,6 +62,8 @@ class UpdateProjectPreparationRequest extends FormRequest
             'tasks.*.description' => ['nullable', 'string', 'max:2000'],
             'tasks.*.plan_start_date' => ['required', 'date'],
             'tasks.*.plan_end_date' => ['required', 'date'],
+            'tasks.*.actual_start_date' => ['nullable', 'date'],
+            'tasks.*.actual_end_date' => ['nullable', 'date'],
             'tasks.*.attachments' => ['nullable', 'array'],
             'tasks.*.attachments.*' => ['file', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', 'max:10240'],
         ];
@@ -69,5 +74,37 @@ class UpdateProjectPreparationRequest extends FormRequest
         $this->merge([
             'mandays' => $this->normalizeDecimalInput($this->input('mandays')),
         ]);
+    }
+
+    /**
+     * @return array<int, callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($this->user()?->can('override_actual_dates') === true) {
+                    return;
+                }
+
+                foreach (['actual_start_date', 'actual_end_date'] as $field) {
+                    if ($this->has($field)) {
+                        $validator->errors()->add($field, 'You do not have permission to override actual dates.');
+                    }
+                }
+
+                foreach ((array) $this->input('tasks', []) as $index => $task) {
+                    if (! is_array($task)) {
+                        continue;
+                    }
+
+                    foreach (['actual_start_date', 'actual_end_date'] as $field) {
+                        if (array_key_exists($field, $task)) {
+                            $validator->errors()->add("tasks.{$index}.{$field}", 'You do not have permission to override task actual dates.');
+                        }
+                    }
+                }
+            },
+        ];
     }
 }

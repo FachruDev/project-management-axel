@@ -14,6 +14,7 @@ class ProjectTaskTransitionService
 {
     public function __construct(
         private readonly ProjectAuditLogger $auditLogger,
+        private readonly ProjectTaskActualDateService $actualDateService,
     ) {}
 
     /**
@@ -27,7 +28,10 @@ class ProjectTaskTransitionService
         'cancelled' => [],
     ];
 
-    public function updateStatus(ProjectTask $task, TaskStatus $targetStatus, User $actor, ?string $reason = null): ProjectTask
+    /**
+     * @param  array<string, mixed>  $actualDateOverrides
+     */
+    public function updateStatus(ProjectTask $task, TaskStatus $targetStatus, User $actor, ?string $reason = null, array $actualDateOverrides = []): ProjectTask
     {
         $currentStatus = $this->currentStatus($task);
 
@@ -41,11 +45,10 @@ class ProjectTaskTransitionService
             ]);
         }
 
-        return DB::transaction(function () use ($task, $currentStatus, $targetStatus, $actor, $reason): ProjectTask {
+        return DB::transaction(function () use ($task, $currentStatus, $targetStatus, $actor, $reason, $actualDateOverrides): ProjectTask {
             $task->forceFill([
                 'status' => $targetStatus,
-                'actual_start_date' => $this->actualStartDate($task, $currentStatus, $targetStatus),
-                'actual_end_date' => $targetStatus === TaskStatus::Done ? ($task->actual_end_date ?? today()) : null,
+                ...$this->actualDateService->forStatus($task, $targetStatus, $actualDateOverrides),
             ])->save();
 
             $task = $task->refresh()->load('project');
@@ -116,23 +119,6 @@ class ProjectTaskTransitionService
         }
 
         return TaskStatus::from((string) $status);
-    }
-
-    private function actualStartDate(ProjectTask $task, TaskStatus $currentStatus, TaskStatus $targetStatus): mixed
-    {
-        if ($targetStatus === TaskStatus::Cancelled) {
-            return $task->actual_start_date;
-        }
-
-        if ($targetStatus === TaskStatus::Todo || $targetStatus === TaskStatus::Assigned) {
-            return null;
-        }
-
-        if ($targetStatus !== TaskStatus::InProgress && $targetStatus !== TaskStatus::Done) {
-            return $task->actual_start_date;
-        }
-
-        return $task->actual_start_date ?? today();
     }
 
     private function isBackward(TaskStatus $currentStatus, TaskStatus $targetStatus): bool

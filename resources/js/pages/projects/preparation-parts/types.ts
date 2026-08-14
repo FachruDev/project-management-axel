@@ -22,6 +22,8 @@ export type PreparationPayload = {
     request_evidence: File[];
     plan_start_date: string;
     plan_end_date: string;
+    actual_start_date: string;
+    actual_end_date: string;
     uat_date: string;
     uat_file: File | null;
     bast_date: string;

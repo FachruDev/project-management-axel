@@ -14,6 +14,7 @@ use App\Models\ProjectMember;
 use App\Models\ProjectTask;
 use App\Models\TaskType;
 use App\Models\User;
+use DateTimeInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,7 @@ class ProjectWriteService
     public function __construct(
         private readonly ProjectLifecycleService $lifecycleService,
         private readonly ProjectAuditLogger $auditLogger,
+        private readonly ProjectTaskActualDateService $taskActualDateService,
     ) {}
 
     /**
@@ -79,7 +81,7 @@ class ProjectWriteService
         return DB::transaction(function () use ($project, $data, $actor): Project {
             $oldData = $this->projectPreparationSnapshot($project);
 
-            $project->update([
+            $projectPayload = [
                 'name' => $data['name'],
                 'project_date' => $data['project_date'],
                 'mandays' => $data['mandays'],
@@ -94,7 +96,13 @@ class ProjectWriteService
                 'uat_date' => $data['uat_date'] ?? null,
                 'bast_date' => $data['bast_date'] ?? null,
                 'updated_by' => $actor->id,
-            ]);
+            ];
+
+            foreach ($this->actualDateOverrides($data, $actor) as $field => $value) {
+                $projectPayload[$field] = $value;
+            }
+
+            $project->update($projectPayload);
 
             $this->syncCustomers($project, $data);
             $this->syncMembers($project, Arr::wrap($data['members'] ?? []), $actor);
@@ -274,6 +282,14 @@ class ProjectWriteService
                 ? null
                 : $membersByUserId->get((int) $task['pic_user_id']);
             $status = $this->taskStatusForPayload($task, $projectMember);
+            $projectTask = null;
+
+            if (! empty($task['id'])) {
+                $projectTask = $project->tasks()
+                    ->whereKey((int) $task['id'])
+                    ->firstOrFail();
+            }
+
             $payload = [
                 'task_type_id' => $this->validatedTaskTypeId($project, $task['task_type_id'] ?? null),
                 'project_member_id' => $projectMember?->id,
@@ -282,14 +298,14 @@ class ProjectWriteService
                 'description' => $task['description'] ?? null,
                 'plan_start_date' => $task['plan_start_date'],
                 'plan_end_date' => $task['plan_end_date'],
-                'actual_start_date' => $this->actualStartDateForTask($status, $task),
-                'actual_end_date' => $this->actualEndDateForTask($status, $task),
+                ...$this->taskActualDateService->forStatus(
+                    $projectTask,
+                    $status,
+                    $this->actualDateOverrides($task, $actor),
+                ),
             ];
 
-            if (! empty($task['id'])) {
-                $projectTask = $project->tasks()
-                    ->whereKey((int) $task['id'])
-                    ->firstOrFail();
+            if ($projectTask instanceof ProjectTask) {
                 $oldData = $this->taskSnapshot($projectTask);
 
                 $projectTask->update($payload);
@@ -456,30 +472,6 @@ class ProjectWriteService
         }
     }
 
-    /**
-     * @param  array<string, mixed>  $task
-     */
-    private function actualStartDateForTask(TaskStatus $status, array $task): ?string
-    {
-        if (! in_array($status, [TaskStatus::InProgress, TaskStatus::Done], true)) {
-            return null;
-        }
-
-        return $task['actual_start_date'] ?? now()->toDateString();
-    }
-
-    /**
-     * @param  array<string, mixed>  $task
-     */
-    private function actualEndDateForTask(TaskStatus $status, array $task): ?string
-    {
-        if ($status !== TaskStatus::Done) {
-            return null;
-        }
-
-        return $task['actual_end_date'] ?? now()->toDateString();
-    }
-
     private function ensureEditableProject(Project $project): void
     {
         if (in_array($project->currentStatus(), [ProjectStatus::Draft, ProjectStatus::Rejected], true)) {
@@ -520,6 +512,8 @@ class ProjectWriteService
             'urs_number',
             'plan_start_date',
             'plan_end_date',
+            'actual_start_date',
+            'actual_end_date',
             'uat_date',
             'bast_date',
             'updated_by',
@@ -592,5 +586,39 @@ class ProjectWriteService
             'permission',
             'granted_by',
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function actualDateOverrides(array $data, User $actor): array
+    {
+        if (! $actor->can('override_actual_dates')) {
+            return [];
+        }
+
+        $overrides = [];
+
+        foreach (['actual_start_date', 'actual_end_date'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $overrides[$field] = $this->normalizedDate($data[$field]);
+            }
+        }
+
+        return $overrides;
+    }
+
+    private function normalizedDate(mixed $value): ?string
+    {
+        if ($value instanceof DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (string) $value;
     }
 }

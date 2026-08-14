@@ -24,6 +24,7 @@ import type {
     PreparationTask,
     ProjectPreparationProps,
     ProjectTaskTypeOption,
+    Auth,
 } from '@/types';
 
 import {
@@ -54,6 +55,9 @@ export default function ProjectPreparation({
     const flash = usePage().props.flash as
         { success?: string | null } | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
+    const { auth } = usePage().props as unknown as { auth: Auth };
+    const canOverrideActualDates =
+        auth.user?.permissions.includes('override_actual_dates') ?? false;
     const [taskTypeModalOpen, setTaskTypeModalOpen] = useState(false);
     const [editingTaskType, setEditingTaskType] =
         useState<ProjectTaskTypeOption | null>(null);
@@ -78,6 +82,8 @@ export default function ProjectPreparation({
         request_evidence: [],
         plan_start_date: project.plan_start_date ?? '',
         plan_end_date: project.plan_end_date ?? '',
+        actual_start_date: project.actual_start_date ?? '',
+        actual_end_date: project.actual_end_date ?? '',
         uat_date: project.uat_date ?? '',
         uat_file: null,
         bast_date: project.bast_date ?? '',
@@ -126,7 +132,31 @@ export default function ProjectPreparation({
 
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        form.transform((data) => ({ ...data, _method: 'PUT' }));
+        form.transform((data) => {
+            const payload: Partial<PreparationPayload> & {
+                _method: string;
+                tasks: PreparationTask[];
+            } = { ...data, _method: 'PUT' };
+
+            if (canOverrideActualDates) {
+                return payload;
+            }
+
+            delete payload.actual_start_date;
+            delete payload.actual_end_date;
+
+            return {
+                ...payload,
+                tasks: payload.tasks.map((task) => {
+                    const nextTask = { ...task };
+
+                    delete nextTask.actual_start_date;
+                    delete nextTask.actual_end_date;
+
+                    return nextTask;
+                }),
+            };
+        });
         form.post(update.url(project.id), {
             forceFormData: true,
             preserveScroll: true,
@@ -298,6 +328,7 @@ export default function ProjectPreparation({
                         form={form}
                         showUat={showUat}
                         showBast={showBast}
+                        canOverrideActualDates={canOverrideActualDates}
                     />
                     <MembersSection
                         form={form}

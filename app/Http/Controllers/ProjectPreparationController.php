@@ -87,6 +87,8 @@ class ProjectPreparationController extends Controller
             'urs_number' => $project->urs_number,
             'plan_start_date' => $this->dateString($project->plan_start_date),
             'plan_end_date' => $this->dateString($project->plan_end_date),
+            'actual_start_date' => $this->dateString($project->actual_start_date),
+            'actual_end_date' => $this->dateString($project->actual_end_date),
             'uat_date' => $this->dateString($project->uat_date),
             'bast_date' => $this->dateString($project->bast_date),
             'customers' => $project->customers->map(fn ($customer): array => [
@@ -121,6 +123,8 @@ class ProjectPreparationController extends Controller
                 'description' => $task->description,
                 'plan_start_date' => $this->dateString($task->plan_start_date),
                 'plan_end_date' => $this->dateString($task->plan_end_date),
+                'actual_start_date' => $this->dateString($task->actual_start_date),
+                'actual_end_date' => $this->dateString($task->actual_end_date),
                 'attachments_count' => $task->attachments->count(),
                 'task_type' => $task->taskType ? [
                     'id' => $task->taskType->id,

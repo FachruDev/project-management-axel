@@ -135,6 +135,21 @@ class ProjectLifecycleServiceTest extends TestCase
         $this->assertTrue($project->actual_start_date->isSameDay(today()));
     }
 
+    public function test_start_repairs_missing_actual_start_date_for_existing_ongoing_project(): void
+    {
+        $this->travelTo(now());
+
+        $project = $this->preparedProject([
+            'status' => ProjectStatus::Ongoing,
+            'actual_start_date' => null,
+        ]);
+
+        $project = app(ProjectLifecycleService::class)->start($project, User::factory()->create());
+
+        $this->assertSame(ProjectStatus::Ongoing, $project->status);
+        $this->assertTrue($project->actual_start_date->isSameDay(today()));
+    }
+
     public function test_refresh_automatic_status_promotes_ongoing_to_awaiting_bast_when_all_tasks_done(): void
     {
         $project = $this->ongoingProjectWithUat();

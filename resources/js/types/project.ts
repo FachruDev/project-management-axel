@@ -164,6 +164,8 @@ export type PreparationProject = {
     urs_number: string | null;
     plan_start_date: string | null;
     plan_end_date: string | null;
+    actual_start_date: string | null;
+    actual_end_date: string | null;
     uat_date: string | null;
     bast_date: string | null;
     customers: CustomerProjectOption[];
@@ -200,6 +202,8 @@ export type PreparationTask = {
     description: string | null;
     plan_start_date: string;
     plan_end_date: string;
+    actual_start_date?: string | null;
+    actual_end_date?: string | null;
     attachments?: File[];
     attachments_count?: number;
     allowed_statuses?: ProjectTaskStatus[];

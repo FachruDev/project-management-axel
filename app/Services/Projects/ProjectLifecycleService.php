@@ -117,8 +117,13 @@ class ProjectLifecycleService
      */
     public function start(Project $project, User $actor): Project
     {
-        $this->ensureStatus($project, [ProjectStatus::Planning]);
-        $this->validator->validateFor($project, ProjectStatus::Ongoing);
+        $currentStatus = $project->currentStatus();
+
+        $this->ensureStatus($project, [ProjectStatus::Planning, ProjectStatus::Ongoing]);
+
+        if ($currentStatus === ProjectStatus::Planning) {
+            $this->validator->validateFor($project, ProjectStatus::Ongoing);
+        }
 
         return DB::transaction(function () use ($project): Project {
             $project->forceFill([

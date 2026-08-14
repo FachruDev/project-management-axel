@@ -29,6 +29,8 @@ class UpdateProjectTaskRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:2000'],
             'plan_start_date' => ['required', 'date'],
             'plan_end_date' => ['required', 'date', 'after_or_equal:plan_start_date'],
+            'actual_start_date' => ['nullable', 'date'],
+            'actual_end_date' => ['nullable', 'date', 'after_or_equal:actual_start_date'],
             'reason' => ['nullable', 'string', 'max:2000'],
         ];
     }
@@ -71,6 +73,16 @@ class UpdateProjectTaskRequest extends FormRequest
 
                     if (! $memberExists) {
                         $validator->errors()->add('pic_user_id', 'Selected PIC must be a project member.');
+                    }
+                }
+
+                if ($this->user()?->can('override_actual_dates') === true) {
+                    return;
+                }
+
+                foreach (['actual_start_date', 'actual_end_date'] as $field) {
+                    if ($this->has($field)) {
+                        $validator->errors()->add($field, 'You do not have permission to override actual dates.');
                     }
                 }
             },

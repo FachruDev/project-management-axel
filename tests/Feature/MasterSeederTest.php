@@ -55,6 +55,7 @@ class MasterSeederTest extends TestCase
         $this->assertTrue($user->can('manage_users'));
         $this->assertTrue($user->can('manage_roles'));
         $this->assertTrue($user->can('manage_working_calendar'));
+        $this->assertTrue($user->can('override_actual_dates'));
         $this->assertSame('incentive', $calculatePermission->getAttribute('category'));
         $this->assertNotNull($user->department_id);
         $this->assertGreaterThanOrEqual(5, Department::count());
@@ -64,6 +65,7 @@ class MasterSeederTest extends TestCase
         $this->assertTrue(Role::findByName('admin')->hasPermissionTo('approve_projects'));
         $this->assertTrue(Role::findByName('admin')->hasPermissionTo('manage_working_calendar'));
         $this->assertFalse(Role::findByName('admin')->hasPermissionTo('manage_users'));
+        $this->assertFalse(Role::findByName('admin')->hasPermissionTo('override_actual_dates'));
         $this->assertTrue(Role::findByName('support')->hasPermissionTo('view_projects'));
         $this->assertTrue(Role::findByName('support')->hasPermissionTo('manage_projects'));
         $this->assertTrue(Role::findByName('support')->hasPermissionTo('view_tasks'));
@@ -71,6 +73,7 @@ class MasterSeederTest extends TestCase
         $this->assertTrue(Role::findByName('support')->hasPermissionTo('manage_customers'));
         $this->assertFalse(Role::findByName('support')->hasPermissionTo('manage_working_calendar'));
         $this->assertFalse(Role::findByName('support')->hasPermissionTo('manage_users'));
+        $this->assertFalse(Role::findByName('support')->hasPermissionTo('override_actual_dates'));
         $this->assertGreaterThanOrEqual(3, Customer::count());
         $this->assertSame(7, WorkingDayRule::count());
         $this->assertFalse(WorkingDayRule::query()->where('day_of_week', 7)->firstOrFail()->is_working);

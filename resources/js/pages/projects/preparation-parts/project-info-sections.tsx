@@ -222,10 +222,12 @@ export function ProjectDocumentSections({
     form,
     showUat,
     showBast,
+    canOverrideActualDates,
 }: {
     form: PreparationForm;
     showUat: boolean;
     showBast: boolean;
+    canOverrideActualDates: boolean;
 }) {
     return (
         <>
@@ -314,6 +316,42 @@ export function ProjectDocumentSections({
                             className={inputClass}
                         />
                     </Field>
+                    {canOverrideActualDates && (
+                        <>
+                            <Field
+                                label="Actual Start"
+                                error={form.errors.actual_start_date}
+                            >
+                                <input
+                                    type="date"
+                                    value={form.data.actual_start_date}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'actual_start_date',
+                                            event.target.value,
+                                        )
+                                    }
+                                    className={inputClass}
+                                />
+                            </Field>
+                            <Field
+                                label="Actual End"
+                                error={form.errors.actual_end_date}
+                            >
+                                <input
+                                    type="date"
+                                    value={form.data.actual_end_date}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'actual_end_date',
+                                            event.target.value,
+                                        )
+                                    }
+                                    className={inputClass}
+                                />
+                            </Field>
+                        </>
+                    )}
                 </div>
             </Panel>
 
