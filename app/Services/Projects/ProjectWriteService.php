@@ -26,6 +26,7 @@ class ProjectWriteService
         private readonly ProjectLifecycleService $lifecycleService,
         private readonly ProjectAuditLogger $auditLogger,
         private readonly ProjectTaskActualDateService $taskActualDateService,
+        private readonly ProjectAttachmentService $attachmentService,
     ) {}
 
     /**
@@ -396,36 +397,7 @@ class ProjectWriteService
             return;
         }
 
-        $path = $file->store('project-attachments');
-
-        if ($path === false) {
-            throw ValidationException::withMessages([
-                $collection->value => ['Project attachment could not be stored.'],
-            ]);
-        }
-
-        $attachment = Attachment::create([
-            'attachable_type' => Project::class,
-            'attachable_id' => $project->id,
-            'collection' => $collection,
-            'disk' => 'local',
-            'path' => $path,
-            'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getClientMimeType(),
-            'size' => $file->getSize(),
-            'uploaded_by' => $actor->id,
-        ]);
-
-        $this->auditLogger->log(
-            $project,
-            $actor,
-            'attachment_uploaded',
-            $attachment,
-            null,
-            $this->attachmentSnapshot($attachment),
-            null,
-            'preparation',
-        );
+        $this->attachmentService->storeProjectFile($project, $file, $collection, $actor);
     }
 
     /**

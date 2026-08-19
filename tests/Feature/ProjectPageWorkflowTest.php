@@ -386,6 +386,196 @@ class ProjectPageWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_preparation_page_includes_existing_attachment_actions(): void
+    {
+        $user = $this->userWithPermissions(['manage_projects']);
+        $project = $this->preparedProject($user);
+        $attachment = Attachment::factory()->create([
+            'attachable_type' => Project::class,
+            'attachable_id' => $project->id,
+            'collection' => AttachmentCollection::UatFile,
+            'original_name' => 'uat-result.pdf',
+            'mime_type' => 'application/pdf',
+            'uploaded_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('projects.preparation.show', $project))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('projects/preparation')
+                ->where('project.attachments.uat_file.0.id', $attachment->id)
+                ->where('project.attachments.uat_file.0.original_name', 'uat-result.pdf')
+                ->where('project.attachments.uat_file.0.mime_type', 'application/pdf')
+                ->where('project.attachments.uat_file.0.url', route('attachments.show', $attachment))
+                ->where('project.attachments.uat_file.0.download_url', route('attachments.show', $attachment)));
+    }
+
+    public function test_attachment_show_uses_inline_pdf_downloads_other_files_and_delete_removes_file(): void
+    {
+        Storage::fake('local');
+
+        $user = $this->userWithPermissions(['view_projects', 'manage_projects']);
+        $project = $this->preparedProject($user);
+
+        Storage::disk('local')->put('project-files/contract.pdf', 'pdf-content');
+        Storage::disk('local')->put('project-files/evidence.xlsx', 'xlsx-content');
+
+        $pdf = Attachment::factory()->create([
+            'attachable_type' => Project::class,
+            'attachable_id' => $project->id,
+            'collection' => AttachmentCollection::UrsFile,
+            'path' => 'project-files/contract.pdf',
+            'original_name' => 'contract.pdf',
+            'mime_type' => 'application/pdf',
+            'uploaded_by' => $user->id,
+        ]);
+        $spreadsheet = Attachment::factory()->create([
+            'attachable_type' => Project::class,
+            'attachable_id' => $project->id,
+            'collection' => AttachmentCollection::RequestEvidence,
+            'path' => 'project-files/evidence.xlsx',
+            'original_name' => 'evidence.xlsx',
+            'mime_type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'uploaded_by' => $user->id,
+        ]);
+
+        $pdfResponse = $this->actingAs($user)->get(route('attachments.show', $pdf));
+        $this->assertStringContainsString('inline', (string) $pdfResponse->headers->get('content-disposition'));
+
+        $spreadsheetResponse = $this->actingAs($user)->get(route('attachments.show', $spreadsheet));
+        $this->assertStringContainsString('attachment', (string) $spreadsheetResponse->headers->get('content-disposition'));
+
+        $this->actingAs($user)
+            ->delete(route('attachments.destroy', $spreadsheet))
+            ->assertSessionHasNoErrors();
+
+        Storage::disk('local')->assertMissing('project-files/evidence.xlsx');
+        $this->assertDatabaseMissing('attachments', ['id' => $spreadsheet->id]);
+        $this->assertDatabaseHas('activity_log', [
+            'subject_type' => Project::class,
+            'subject_id' => $project->id,
+            'event' => 'attachment_deleted',
+        ]);
+    }
+
+    public function test_project_status_move_to_awaiting_bast_accepts_missing_bast_after_tasks_done(): void
+    {
+        Storage::fake('local');
+
+        $user = $this->userWithPermissions(['manage_projects']);
+        $project = $this->preparedProject($user);
+        $project->update([
+            'status' => ProjectStatus::Ongoing,
+            'uat_date' => '2026-08-18',
+        ]);
+        Attachment::factory()->create([
+            'attachable_type' => Project::class,
+            'attachable_id' => $project->id,
+            'collection' => AttachmentCollection::UatFile,
+            'uploaded_by' => $user->id,
+        ]);
+        $project->tasks()->update([
+            'status' => TaskStatus::Done,
+            'actual_start_date' => '2026-08-13',
+            'actual_end_date' => '2026-08-15',
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('projects.status-move', $project), [
+                'target_status' => ProjectStatus::AwaitingBast->value,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $project->refresh();
+
+        $this->assertSame(ProjectStatus::AwaitingBast, $project->status);
+    }
+
+    public function test_project_status_move_to_awaiting_bast_allows_auto_promotion_to_ready_to_close(): void
+    {
+        Storage::fake('local');
+
+        $user = $this->userWithPermissions(['manage_projects']);
+        $project = $this->preparedProject($user);
+        $project->update([
+            'status' => ProjectStatus::Ongoing,
+            'uat_date' => '2026-08-18',
+            'bast_date' => '2026-08-19',
+        ]);
+        foreach ([AttachmentCollection::UatFile, AttachmentCollection::BastFile] as $collection) {
+            Attachment::factory()->create([
+                'attachable_type' => Project::class,
+                'attachable_id' => $project->id,
+                'collection' => $collection,
+                'uploaded_by' => $user->id,
+            ]);
+        }
+        $project->tasks()->update([
+            'status' => TaskStatus::Done,
+            'actual_start_date' => '2026-08-13',
+            'actual_end_date' => '2026-08-15',
+        ]);
+
+        $this->actingAs($user)
+            ->patch(route('projects.status-move', $project), [
+                'target_status' => ProjectStatus::AwaitingBast->value,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $project->refresh();
+
+        $this->assertSame(ProjectStatus::ReadyToClose, $project->status);
+        $this->assertDatabaseHas('project_status_histories', [
+            'project_id' => $project->id,
+            'from_status' => ProjectStatus::Ongoing->value,
+            'to_status' => ProjectStatus::ReadyToClose->value,
+            'source' => 'drag',
+        ]);
+    }
+
+    public function test_quick_bast_upload_stores_file_audits_and_promotes_ready_to_close(): void
+    {
+        Storage::fake('local');
+
+        $user = $this->userWithPermissions(['manage_projects']);
+        $project = $this->preparedProject($user);
+        $project->update([
+            'status' => ProjectStatus::Ongoing,
+            'uat_date' => '2026-08-18',
+        ]);
+        Attachment::factory()->create([
+            'attachable_type' => Project::class,
+            'attachable_id' => $project->id,
+            'collection' => AttachmentCollection::UatFile,
+            'uploaded_by' => $user->id,
+        ]);
+        $project->tasks()->update([
+            'status' => TaskStatus::Done,
+            'actual_start_date' => '2026-08-13',
+            'actual_end_date' => '2026-08-15',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('projects.bast.update', $project), [
+                '_method' => 'PATCH',
+                'bast_date' => '2026-08-19',
+                'bast_file' => UploadedFile::fake()->create('bast.pdf', 12, 'application/pdf'),
+            ])
+            ->assertSessionHasNoErrors();
+
+        $project->refresh();
+
+        $this->assertSame(ProjectStatus::ReadyToClose, $project->status);
+        $this->assertSame('2026-08-19', $project->bast_date?->toDateString());
+        $this->assertTrue($project->hasAttachment(AttachmentCollection::BastFile));
+        $this->assertDatabaseHas('activity_log', [
+            'subject_type' => Project::class,
+            'subject_id' => $project->id,
+            'event' => 'project_bast_updated',
+        ]);
+    }
+
     public function test_project_status_move_back_one_step_accepts_optional_reason(): void
     {
         $user = $this->userWithPermissions(['manage_projects']);

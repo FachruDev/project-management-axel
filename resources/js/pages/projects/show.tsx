@@ -15,10 +15,13 @@ import {
     Clock,
     History,
     FileCode,
-    Sparkles
+    Sparkles,
+    ExternalLink,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 
+import projectAuditLogs from '@/actions/App/Http/Controllers/ProjectAuditLogController';
 import {
     close,
     index,
@@ -31,7 +34,7 @@ import { show as preparationShow } from '@/actions/App/Http/Controllers/ProjectP
 import { PageHeader } from '@/components/page-header';
 import { ProjectStatusBadge } from '@/components/project-status-badge';
 import { AppLayout } from '@/layouts/app-layout';
-import type { ProjectDetail, ProjectTaskStatus } from '@/types';
+import type { ProjectAuditEntry, ProjectDetail, ProjectTaskStatus } from '@/types';
 
 type Props = {
     project: ProjectDetail;
@@ -48,6 +51,9 @@ const taskTone: Record<ProjectTaskStatus, string> = {
 export default function ProjectShow({ project }: Props) {
     const flash = usePage().props.flash as { success?: string | null } | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
+    const [auditLogs, setAuditLogs] = useState(project.audit_logs);
+    const [auditHasMore, setAuditHasMore] = useState(project.audit_logs_has_more);
+    const [auditLoading, setAuditLoading] = useState(false);
 
     const doneTasks = project.tasks.filter((task) => task.status === 'done').length;
     const progress =
@@ -57,6 +63,42 @@ export default function ProjectShow({ project }: Props) {
 
     function postAction(url: string) {
         router.post(url, {}, { preserveScroll: true });
+    }
+
+    async function loadMoreAuditLogs() {
+        if (auditLoading || !auditHasMore) {
+            return;
+        }
+
+        setAuditLoading(true);
+
+        try {
+            const response = await fetch(
+                projectAuditLogs.url(project.id, {
+                    query: { limit: 10, offset: auditLogs.length },
+                }),
+                {
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                },
+            );
+
+            if (!response.ok) {
+                throw new Error('Audit logs could not be loaded.');
+            }
+
+            const payload = (await response.json()) as {
+                data: ProjectAuditEntry[];
+                has_more: boolean;
+            };
+
+            setAuditLogs((current) => [...current, ...payload.data]);
+            setAuditHasMore(payload.has_more);
+        } finally {
+            setAuditLoading(false);
+        }
     }
 
     return (
@@ -157,6 +199,11 @@ export default function ProjectShow({ project }: Props) {
                                 />
                             </div>
                         </div>
+                        {project.actions.can_close && (
+                            <ActionButton icon={CheckCircle2} onClick={() => postAction(close.url(project.id))}>
+                                Close Project
+                            </ActionButton>
+                        )}
                     </div>
                 </div>
 
@@ -242,7 +289,7 @@ export default function ProjectShow({ project }: Props) {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 font-medium text-slate-600">
-                                        {project.audit_logs.map((log) => (
+                                        {auditLogs.map((log) => (
                                             <tr key={log.id} className="align-top hover:bg-slate-50/50 transition-colors">
                                                 <td className="whitespace-nowrap px-4 py-3 font-mono text-[11px] text-slate-400">
                                                     {formatDateTime(log.changed_at)}
@@ -263,7 +310,7 @@ export default function ProjectShow({ project }: Props) {
                                                 </td>
                                             </tr>
                                         ))}
-                                        {project.audit_logs.length === 0 && (
+                                        {auditLogs.length === 0 && (
                                             <tr>
                                                 <td colSpan={5} className="px-4 py-8 text-center text-slate-400 font-normal">
                                                     No audit history available yet.
@@ -273,6 +320,18 @@ export default function ProjectShow({ project }: Props) {
                                     </tbody>
                                 </table>
                             </div>
+                            {auditHasMore && (
+                                <div className="mt-3 flex justify-center">
+                                    <button
+                                        type="button"
+                                        onClick={loadMoreAuditLogs}
+                                        disabled={auditLoading}
+                                        className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {auditLoading ? 'Loading...' : 'Load 10 more'}
+                                    </button>
+                                </div>
+                            )}
                         </Panel>
 
                     </div>
@@ -352,8 +411,11 @@ export default function ProjectShow({ project }: Props) {
                         <Panel title={`Attachments (${project.attachments.length})`} icon={Paperclip}>
                             <div className="space-y-2">
                                 {project.attachments.map((attachment) => (
-                                    <div
+                                    <a
                                         key={attachment.id}
+                                        href={attachment.url}
+                                        target="_blank"
+                                        rel="noreferrer"
                                         className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-xs"
                                     >
                                         <div className="flex items-center gap-2 truncate pr-2">
@@ -365,7 +427,8 @@ export default function ProjectShow({ project }: Props) {
                                         <span className="shrink-0 rounded bg-slate-200/60 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                                             {attachment.collection.replaceAll('_', ' ')}
                                         </span>
-                                    </div>
+                                        <ExternalLink className="ml-2 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                    </a>
                                 ))}
 
                                 {project.attachments.length === 0 && (

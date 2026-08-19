@@ -2,16 +2,23 @@ import {
     Briefcase,
     CalendarDays,
     CheckCircle,
+    ExternalLink,
     FileText,
     Info,
     MapPin,
+    Trash2,
     UploadCloud,
 } from 'lucide-react';
 import { useMemo } from 'react';
+import { router } from '@inertiajs/react';
 
+import { destroy as destroyAttachment } from '@/actions/App/Http/Controllers/AttachmentController';
 import { MultiSelect } from '@/components/multi-select';
 import type { Option } from '@/components/multi-select';
-import type { ProjectPreparationProps } from '@/types';
+import type {
+    ProjectAttachmentPayload,
+    ProjectPreparationProps,
+} from '@/types';
 
 import type { PreparationForm } from './types';
 import { Field, fileInputClass, inputClass, LockedSection, Panel } from './ui';
@@ -222,11 +229,15 @@ export function ProjectDocumentSections({
     form,
     showUat,
     showBast,
+    canEditBast,
+    attachments,
     canOverrideActualDates,
 }: {
     form: PreparationForm;
     showUat: boolean;
     showBast: boolean;
+    canEditBast: boolean;
+    attachments: ProjectPreparationProps['project']['attachments'];
     canOverrideActualDates: boolean;
 }) {
     return (
@@ -275,6 +286,9 @@ export function ProjectDocumentSections({
                                 )
                             }
                             className={fileInputClass}
+                        />
+                        <ExistingAttachments
+                            attachments={attachments.urs_file ?? []}
                         />
                     </Field>
                 </div>
@@ -371,6 +385,9 @@ export function ProjectDocumentSections({
                         }
                         className={fileInputClass}
                     />
+                    <ExistingAttachments
+                        attachments={attachments.request_evidence ?? []}
+                    />
                 </Field>
             </Panel>
 
@@ -406,6 +423,9 @@ export function ProjectDocumentSections({
                                 }
                                 className={fileInputClass}
                             />
+                            <ExistingAttachments
+                                attachments={attachments.uat_file ?? []}
+                            />
                         </Field>
                     </div>
                 </Panel>
@@ -418,48 +438,115 @@ export function ProjectDocumentSections({
 
             {showBast ? (
                 <Panel title="BAST Information" icon={CheckCircle}>
-                    <div className="grid gap-5 md:grid-cols-2">
-                        <Field
-                            label="BAST Date"
-                            error={form.errors.bast_date}
-                            required
-                        >
-                            <input
-                                type="date"
-                                value={form.data.bast_date}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'bast_date',
-                                        event.target.value,
-                                    )
-                                }
-                                className={inputClass}
+                    {canEditBast ? (
+                        <div className="grid gap-5 md:grid-cols-2">
+                            <Field
+                                label="BAST Date"
+                                error={form.errors.bast_date}
+                                required
+                            >
+                                <input
+                                    type="date"
+                                    value={form.data.bast_date}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'bast_date',
+                                            event.target.value,
+                                        )
+                                    }
+                                    className={inputClass}
+                                />
+                            </Field>
+                            <Field
+                                label="BAST File"
+                                error={form.errors.bast_file}
+                                required
+                            >
+                                <input
+                                    type="file"
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'bast_file',
+                                            event.target.files?.[0] ?? null,
+                                        )
+                                    }
+                                    className={fileInputClass}
+                                />
+                                <ExistingAttachments
+                                    attachments={attachments.bast_file ?? []}
+                                />
+                            </Field>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                                BAST lama tersimpan. Upload BAST baru hanya
+                                aktif saat project berada di Awaiting BAST,
+                                Ready To Close, atau Closed.
+                            </p>
+                            <ExistingAttachments
+                                attachments={attachments.bast_file ?? []}
                             />
-                        </Field>
-                        <Field
-                            label="BAST File"
-                            error={form.errors.bast_file}
-                            required
-                        >
-                            <input
-                                type="file"
-                                onChange={(event) =>
-                                    form.setData(
-                                        'bast_file',
-                                        event.target.files?.[0] ?? null,
-                                    )
-                                }
-                                className={fileInputClass}
-                            />
-                        </Field>
-                    </div>
+                        </div>
+                    )}
                 </Panel>
             ) : (
                 <LockedSection
                     title="BAST Information"
-                    description="Section BAST dikunci sampai UAT date atau UAT file tersedia. Lengkapi UAT terlebih dahulu sebelum mengisi BAST."
+                    description="Section BAST aktif saat semua task selesai dan project masuk Awaiting BAST."
                 />
             )}
         </>
+    );
+}
+
+function ExistingAttachments({
+    attachments,
+}: {
+    attachments: ProjectAttachmentPayload[];
+}) {
+    if (attachments.length === 0) {
+        return null;
+    }
+
+    function removeAttachment(attachment: ProjectAttachmentPayload) {
+        if (!window.confirm(`Delete attachment "${attachment.original_name}"?`)) {
+            return;
+        }
+
+        router.delete(destroyAttachment.url(attachment.id), {
+            preserveScroll: true,
+        });
+    }
+
+    return (
+        <div className="mt-2 space-y-1.5">
+            {attachments.map((attachment) => (
+                <div
+                    key={attachment.id}
+                    className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs"
+                >
+                    <a
+                        href={attachment.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-slate-700 hover:text-primary"
+                    >
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">
+                            {attachment.original_name}
+                        </span>
+                    </a>
+                    <button
+                        type="button"
+                        onClick={() => removeAttachment(attachment)}
+                        className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        title="Delete attachment"
+                    >
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                </div>
+            ))}
+        </div>
     );
 }

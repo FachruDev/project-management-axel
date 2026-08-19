@@ -1,10 +1,17 @@
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
+import { CheckCircle2, UploadCloud } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { index as projectApprovalsIndex } from '@/actions/App/Http/Controllers/ProjectApprovalController';
-import { index as projectsIndex, show as projectShow } from '@/actions/App/Http/Controllers/ProjectController';
+import {
+    close as closeProjectAction,
+    index as projectsIndex,
+    show as projectShow,
+} from '@/actions/App/Http/Controllers/ProjectController';
 import projectPreparationsIndex from '@/actions/App/Http/Controllers/ProjectPreparationIndexController';
 import tasksIndex from '@/actions/App/Http/Controllers/TaskBoardController';
 import { PageHeader } from '@/components/page-header';
+import { ProjectBastModal } from '@/components/project-bast-modal';
 import { ProjectStatusBadge } from '@/components/project-status-badge';
 import { AppLayout } from '@/layouts/app-layout';
 import type { DashboardProjectCard, DashboardProps } from '@/types';
@@ -45,9 +52,18 @@ export default function Welcome({
     project_status_distribution,
     task_status_distribution,
     recent_rejected_projects,
+    awaiting_bast_projects,
     ready_to_close_projects,
     scope,
 }: DashboardProps) {
+    const [bastProject, setBastProject] = useState<DashboardProjectCard | null>(
+        null,
+    );
+
+    function closeProject(project: DashboardProjectCard) {
+        router.post(closeProjectAction.url(project.id), {}, { preserveScroll: true });
+    }
+
     return (
         <AppLayout title="Project Management">
             <div className="space-y-6">
@@ -128,16 +144,36 @@ export default function Welcome({
                 {/* Project Lists Grid */}
                 <section className="grid gap-6 xl:grid-cols-2">
                     <ProjectList
-                        title="Ready To Close"
+                        title={`Awaiting BAST (${metrics.awaiting_bast_projects})`}
+                        empty="No project awaiting BAST at the moment."
+                        projects={awaiting_bast_projects}
+                        onUploadBast={setBastProject}
+                        onCloseProject={closeProject}
+                    />
+                    <ProjectList
+                        title={`Ready To Close (${metrics.ready_to_close_projects})`}
                         empty="No project ready to close at the moment."
                         projects={ready_to_close_projects}
+                        onUploadBast={setBastProject}
+                        onCloseProject={closeProject}
                     />
+                </section>
+
+                <section className="grid gap-6 xl:grid-cols-2">
                     <ProjectList
                         title="Recent Rejections"
                         empty="No recently rejected projects."
                         projects={recent_rejected_projects}
+                        onUploadBast={setBastProject}
+                        onCloseProject={closeProject}
                     />
                 </section>
+
+                <ProjectBastModal
+                    open={bastProject !== null}
+                    project={bastProject}
+                    onClose={() => setBastProject(null)}
+                />
             </div>
         </AppLayout>
     );
@@ -202,25 +238,31 @@ function ProjectList({
     title,
     empty,
     projects,
+    onUploadBast,
+    onCloseProject,
 }: {
     title: string;
     empty: string;
     projects: DashboardProjectCard[];
+    onUploadBast: (project: DashboardProjectCard) => void;
+    onCloseProject: (project: DashboardProjectCard) => void;
 }) {
     return (
         <Panel title={title}>
             <div className="space-y-3">
                 {projects.map((project) => (
-                    <Link
+                    <div
                         key={project.id}
-                        href={projectShow.url(project.id)}
                         className="group block rounded-xl border border-slate-200/70 bg-white p-4 transition-all duration-200 hover:border-primary/40 hover:bg-pastel-blue/40 hover:shadow-xs"
                     >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="space-y-1 max-w-[70%]">
-                                <div className="font-bold text-sm text-slate-900 group-hover:text-primary transition-colors">
+                                <Link
+                                    href={projectShow.url(project.id)}
+                                    className="block font-bold text-sm text-slate-900 group-hover:text-primary transition-colors"
+                                >
                                     {project.name}
-                                </div>
+                                </Link>
                                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                                     <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
                                         {project.customer ?? 'No Customer'}
@@ -232,18 +274,37 @@ function ProjectList({
                             <ProjectStatusBadge status={project.status} />
                         </div>
 
-                        <div className="mt-3 pt-2.5 border-t border-slate-100/80 flex items-center justify-between text-xs text-slate-400">
+                        <div className="mt-3 pt-2.5 border-t border-slate-100/80 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
                             <div className="flex items-center gap-1">
                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
                                 <span>Plan End: <strong className="text-slate-600">{project.plan_end_date ?? '-'}</strong></span>
                             </div>
-                            <span className="text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                                Detail &rarr;
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {project.actions.can_upload_bast && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onUploadBast(project)}
+                                        className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-1 text-[10px] font-bold text-purple-800 hover:bg-purple-100"
+                                    >
+                                        <UploadCloud className="h-3 w-3" />
+                                        <span>Upload BAST</span>
+                                    </button>
+                                )}
+                                {project.actions.can_close && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onCloseProject(project)}
+                                        className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800 hover:bg-emerald-100"
+                                    >
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        <span>Close</span>
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                    </Link>
+                    </div>
                 ))}
 
                 {projects.length === 0 && (

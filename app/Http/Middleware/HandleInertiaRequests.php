@@ -2,7 +2,12 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\ProjectStatus;
+use App\Models\Project;
+use App\Models\User;
+use App\Services\Projects\ProjectVisibilityService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -15,6 +20,10 @@ class HandleInertiaRequests extends Middleware
      * @var string
      */
     protected $rootView = 'app';
+
+    public function __construct(
+        private readonly ProjectVisibilityService $visibility,
+    ) {}
 
     /**
      * Determines the current asset version.
@@ -54,12 +63,48 @@ class HandleInertiaRequests extends Middleware
             'embed' => [
                 'prefix' => $request->headers->get('X-Portal-Embed-Prefix', ''),
             ],
+            'project_reminders' => fn (): array => $this->projectReminders($request),
             'flash' => [
                 'success' => fn (): mixed => $request->session()->get('success'),
                 'excel_error_title' => fn (): mixed => $request->session()->get('excel_error_title'),
                 'excel_errors' => fn (): mixed => $request->session()->get('excel_errors'),
                 'calculation_summary' => fn (): mixed => $request->session()->get('calculation_summary'),
             ],
+        ];
+    }
+
+    /**
+     * @return array{awaiting_bast: int, ready_to_close: int, actionable_total: int}
+     */
+    private function projectReminders(Request $request): array
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            return [
+                'awaiting_bast' => 0,
+                'ready_to_close' => 0,
+                'actionable_total' => 0,
+            ];
+        }
+
+        $counts = $this->visibility
+            ->visibleProjects(Project::query(), $user)
+            ->select('status', DB::raw('count(*) as aggregate'))
+            ->whereIn('status', [
+                ProjectStatus::AwaitingBast->value,
+                ProjectStatus::ReadyToClose->value,
+            ])
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        $awaitingBast = (int) ($counts[ProjectStatus::AwaitingBast->value] ?? 0);
+        $readyToClose = (int) ($counts[ProjectStatus::ReadyToClose->value] ?? 0);
+
+        return [
+            'awaiting_bast' => $awaitingBast,
+            'ready_to_close' => $readyToClose,
+            'actionable_total' => $awaitingBast + $readyToClose,
         ];
     }
 }

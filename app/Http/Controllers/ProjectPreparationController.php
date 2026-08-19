@@ -15,6 +15,7 @@ use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\TaskType;
 use App\Models\User;
+use App\Services\Projects\ProjectAttachmentService;
 use App\Services\Projects\ProjectTaskTransitionService;
 use App\Services\Projects\ProjectWriteService;
 use DateTimeInterface;
@@ -28,6 +29,7 @@ class ProjectPreparationController extends Controller
     public function __construct(
         private readonly ProjectWriteService $writeService,
         private readonly ProjectTaskTransitionService $transitionService,
+        private readonly ProjectAttachmentService $attachmentService,
     ) {}
 
     public function show(Project $project): Response
@@ -236,7 +238,7 @@ class ProjectPreparationController extends Controller
     }
 
     /**
-     * @return array<string, array<int, array{id: int, original_name: string}>>
+     * @return array<string, array<int, array<string, mixed>>>
      */
     private function attachmentPayload(Project $project): array
     {
@@ -245,10 +247,7 @@ class ProjectPreparationController extends Controller
         foreach (AttachmentCollection::cases() as $collection) {
             $payload[$collection->value] = $project->attachments
                 ->filter(fn (Attachment $attachment): bool => $this->attachmentCollectionValue($attachment) === $collection->value)
-                ->map(fn (Attachment $attachment): array => [
-                    'id' => $attachment->id,
-                    'original_name' => $attachment->original_name,
-                ])
+                ->map(fn (Attachment $attachment): array => $this->attachmentService->payload($attachment))
                 ->values()
                 ->all();
         }

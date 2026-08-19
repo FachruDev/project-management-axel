@@ -19,7 +19,7 @@ class ProjectStatusMoveController extends Controller
     public function __invoke(MoveProjectStatusRequest $request, Project $project): RedirectResponse
     {
         try {
-            $this->moveService->move(
+            $project = $this->moveService->move(
                 $project,
                 ProjectStatus::from((string) $request->validated('target_status')),
                 $this->actor($request),
@@ -29,7 +29,7 @@ class ProjectStatusMoveController extends Controller
             return back()->withErrors(['target_status' => $exception->getMessage()]);
         }
 
-        return back()->with('success', 'Project status updated.');
+        return back()->with('success', 'Project status is now '.str($project->currentStatus()->value)->replace('_', ' ')->headline()->toString().'.');
     }
 
     private function actor(MoveProjectStatusRequest $request): User

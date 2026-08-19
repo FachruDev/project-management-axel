@@ -99,15 +99,17 @@ class ProjectStatusMoveService
             ]),
         };
 
-        if ($project->currentStatus() !== $targetStatus) {
+        $finalStatus = $project->currentStatus();
+
+        if ($this->rank[$finalStatus->value] < $this->rank[$targetStatus->value]) {
             throw ValidationException::withMessages([
                 'target_status' => ['Project data is not complete for the target status.'],
             ]);
         }
 
-        $this->recordHistory($project, $currentStatus, $targetStatus, $actor, null, 'drag');
-        $this->recordAudit($project, $currentStatus, $targetStatus, $actor, null);
-        $this->broadcastChange($project, $currentStatus, $targetStatus, $actor, 'project_status_moved');
+        $this->recordHistory($project, $currentStatus, $finalStatus, $actor, null, 'drag');
+        $this->recordAudit($project, $currentStatus, $finalStatus, $actor, null);
+        $this->broadcastChange($project, $currentStatus, $finalStatus, $actor, 'project_status_moved');
 
         return $project;
     }

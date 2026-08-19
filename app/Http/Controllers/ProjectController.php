@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\AttachmentCollection;
 use App\Enums\IncentiveProfileStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\TaskStatus;
@@ -16,7 +15,9 @@ use App\Models\IncentiveProfile;
 use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\User;
+use App\Services\Projects\ProjectAttachmentService;
 use App\Services\Projects\ProjectAuditLogger;
+use App\Services\Projects\ProjectAuditLogService;
 use App\Services\Projects\ProjectLifecycleService;
 use App\Services\Projects\ProjectVisibilityService;
 use App\Services\Projects\ProjectWriteService;
@@ -28,7 +29,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Activitylog\Models\Activity;
 
 class ProjectController extends Controller
 {
@@ -37,6 +37,8 @@ class ProjectController extends Controller
         private readonly ProjectLifecycleService $lifecycleService,
         private readonly ProjectVisibilityService $visibility,
         private readonly ProjectAuditLogger $auditLogger,
+        private readonly ProjectAttachmentService $attachmentService,
+        private readonly ProjectAuditLogService $auditLogService,
     ) {}
 
     public function index(Request $request): Response
@@ -243,7 +245,7 @@ class ProjectController extends Controller
 
         return redirect()
             ->route('projects.show', $project)
-            ->with('success', 'Project status refreshed.');
+            ->with('success', 'Project status is now '.str($project->currentStatus()->value)->replace('_', ' ')->headline()->toString().'.');
     }
 
     public function close(Request $request, Project $project): RedirectResponse
@@ -308,6 +310,8 @@ class ProjectController extends Controller
      */
     private function detail(Project $project): array
     {
+        $auditLogs = $this->auditLogService->paginate($project, 5);
+
         return [
             ...$this->summary($project),
             'location' => $project->location,
@@ -338,12 +342,12 @@ class ProjectController extends Controller
                 'plan_end_date' => $this->dateString($task->plan_end_date),
                 'pic' => $task->member?->user ? $this->userOption($task->member->user) : null,
             ])->values()->all(),
-            'attachments' => $project->attachments->map(fn (Attachment $attachment): array => [
-                'id' => $attachment->id,
-                'collection' => $this->attachmentCollectionValue($attachment),
-                'original_name' => $attachment->original_name,
-            ])->values()->all(),
-            'audit_logs' => $this->auditLogs($project),
+            'attachments' => $project->attachments
+                ->map(fn (Attachment $attachment): array => $this->attachmentService->payload($attachment))
+                ->values()
+                ->all(),
+            'audit_logs' => $auditLogs['data'],
+            'audit_logs_has_more' => $auditLogs['has_more'],
         ];
     }
 
@@ -353,6 +357,9 @@ class ProjectController extends Controller
     private function actions(Project $project): array
     {
         $status = $project->currentStatus();
+        $tasksCount = (int) ($project->tasks_count ?? 0);
+        $doneTasksCount = (int) ($project->done_tasks_count ?? 0);
+        $allTasksDone = $tasksCount > 0 && $tasksCount === $doneTasksCount;
 
         return [
             'can_edit_basic' => in_array($status, [ProjectStatus::Draft, ProjectStatus::Rejected], true),
@@ -362,6 +369,8 @@ class ProjectController extends Controller
             'can_start' => $status === ProjectStatus::Planning,
             'can_refresh' => in_array($status, [ProjectStatus::Planning, ProjectStatus::Ongoing, ProjectStatus::AwaitingBast], true),
             'can_close' => $status === ProjectStatus::ReadyToClose,
+            'can_upload_bast' => $status === ProjectStatus::AwaitingBast
+                || (in_array($status, [ProjectStatus::Planning, ProjectStatus::Ongoing], true) && $allTasksDone),
         ];
     }
 
@@ -452,7 +461,11 @@ class ProjectController extends Controller
             'members.user',
             'tasks.member.user',
             'attachments',
-        ])->loadCount(['tasks', 'members']);
+        ])->loadCount([
+            'tasks',
+            'members',
+            'tasks as done_tasks_count' => fn ($query) => $query->where('status', TaskStatus::Done->value),
+        ]);
     }
 
     /**
@@ -492,17 +505,6 @@ class ProjectController extends Controller
         }
 
         return (string) $status;
-    }
-
-    private function attachmentCollectionValue(Attachment $attachment): string
-    {
-        $collection = $attachment->getAttribute('collection');
-
-        if ($collection instanceof AttachmentCollection) {
-            return $collection->value;
-        }
-
-        return (string) $collection;
     }
 
     private function actor(Request $request): User
@@ -546,33 +548,6 @@ class ProjectController extends Controller
             'uat_date',
             'bast_date',
         ]);
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function auditLogs(Project $project): array
-    {
-        return Activity::query()
-            ->with('causer')
-            ->forSubject($project)
-            ->latest()
-            ->limit(50)
-            ->get()
-            ->map(fn (Activity $activity): array => [
-                'id' => $activity->id,
-                'action' => (string) ($activity->event ?? $activity->description),
-                'description' => $activity->description,
-                'entity_type' => $activity->getExtraProperty('entity_label'),
-                'entity_id' => $activity->getExtraProperty('entity_id'),
-                'actor' => $activity->causer instanceof User ? $this->userOption($activity->causer) : null,
-                'old' => $activity->getExtraProperty('old'),
-                'new' => $activity->getExtraProperty('new'),
-                'reason' => $activity->getExtraProperty('reason'),
-                'source' => $activity->getExtraProperty('source'),
-                'changed_at' => $activity->getExtraProperty('changed_at') ?? $this->dateString($activity->created_at),
-            ])
-            ->all();
     }
 
     private function broadcastProjectChange(int $projectId, ?string $oldStatus, ?string $newStatus, string $action, User $actor): void

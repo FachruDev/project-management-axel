@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerExcelController;
 use App\Http\Controllers\DashboardController;
@@ -9,6 +10,8 @@ use App\Http\Controllers\HolidayExcelController;
 use App\Http\Controllers\ImportPreviewController;
 use App\Http\Controllers\IncentiveProfileController;
 use App\Http\Controllers\ProjectApprovalController;
+use App\Http\Controllers\ProjectAuditLogController;
+use App\Http\Controllers\ProjectBastController;
 use App\Http\Controllers\ProjectBulkDeleteController;
 use App\Http\Controllers\ProjectBulkTaskController;
 use App\Http\Controllers\ProjectCalculationController;
@@ -102,6 +105,13 @@ Route::middleware('portal.auth')->group(function (): void {
         ->middleware('can:approve_projects')
         ->name('project-approvals.reject');
 
+    Route::get('attachments/{attachment}', [AttachmentController::class, 'show'])
+        ->middleware('can:view_projects')
+        ->name('attachments.show');
+    Route::delete('attachments/{attachment}', [AttachmentController::class, 'destroy'])
+        ->middleware('can:manage_projects')
+        ->name('attachments.destroy');
+
     Route::get('projects/{project}/preparation', [ProjectPreparationController::class, 'show'])
         ->middleware('can:manage_projects')
         ->name('projects.preparation.show');
@@ -123,6 +133,12 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::post('projects/{project}/close', [ProjectController::class, 'close'])
         ->middleware('can:manage_projects')
         ->name('projects.close');
+    Route::patch('projects/{project}/bast', ProjectBastController::class)
+        ->middleware('can:manage_projects')
+        ->name('projects.bast.update');
+    Route::get('projects/{project}/audit-logs', ProjectAuditLogController::class)
+        ->middleware('can:view_projects')
+        ->name('projects.audit-logs');
     Route::patch('projects/{project}/status-move', ProjectStatusMoveController::class)
         ->middleware('can:manage_projects')
         ->name('projects.status-move');

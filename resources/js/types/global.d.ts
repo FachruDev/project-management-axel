@@ -1,5 +1,6 @@
 import type { Auth } from '@/types/auth';
 import type { IncentiveCalculationSummary } from '@/types/incentive-profile';
+import type { ProjectReminderSummary } from '@/types/project';
 
 declare module 'react' {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -16,6 +17,7 @@ declare module '@inertiajs/core' {
             embed: {
                 prefix: string;
             };
+            project_reminders: ProjectReminderSummary;
             flash: {
                 success: string | null;
                 excel_error_title: string | null;

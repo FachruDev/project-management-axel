@@ -2,7 +2,7 @@ import { Link, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { sidebarItems } from '@/navigation/sidebar';
 import type { SidebarItem } from '@/navigation/sidebar';
-import type { Auth } from '@/types';
+import type { Auth, ProjectReminderSummary } from '@/types';
 
 type Props = {
     open: boolean;
@@ -10,7 +10,10 @@ type Props = {
 };
 
 export function AppSidebar({ open, onCollapse }: Props) {
-    const { auth } = usePage().props as unknown as { auth: Auth };
+    const { auth, project_reminders } = usePage().props as unknown as {
+        auth: Auth;
+        project_reminders?: ProjectReminderSummary;
+    };
     const permissions = auth.user?.permissions ?? [];
     const currentUrl = usePage().url.split('?')[0] ?? '/';
 
@@ -18,6 +21,10 @@ export function AppSidebar({ open, onCollapse }: Props) {
         .map((item) => ({
             ...item,
             allowed: item.permission ? permissions.includes(item.permission) : true,
+            badge:
+                item.label === 'Projects'
+                    ? (project_reminders?.actionable_total ?? 0)
+                    : 0,
         }))
         .filter((item) => item.allowed || item.status === 'planned');
 
@@ -101,7 +108,7 @@ function SidebarGroupAccordion({
     currentUrl,
 }: {
     section: string;
-    items: Array<SidebarItem & { allowed: boolean }>;
+    items: Array<SidebarItem & { allowed: boolean; badge: number }>;
     currentUrl: string;
 }) {
     // Check if any sub-item inside this section is currently active
@@ -157,7 +164,7 @@ function SidebarLink({
     item,
     active,
 }: {
-    item: SidebarItem & { allowed: boolean };
+    item: SidebarItem & { allowed: boolean; badge: number };
     active: boolean;
 }) {
     const Icon = item.icon;
@@ -176,7 +183,13 @@ function SidebarLink({
                     <Icon className="h-4 w-4 shrink-0 text-white" />
                     <span>{item.label}</span>
                 </div>
-                <span className="h-1.5 w-1.5 rounded-full bg-white"></span>
+                {item.badge > 0 ? (
+                    <span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-red-600">
+                        {item.badge}
+                    </span>
+                ) : (
+                    <span className="h-1.5 w-1.5 rounded-full bg-white"></span>
+                )}
             </Link>
         );
     }
@@ -191,6 +204,11 @@ function SidebarLink({
                     <Icon className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-primary transition-colors" />
                     <span>{item.label}</span>
                 </div>
+                {item.badge > 0 && (
+                    <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                        {item.badge}
+                    </span>
+                )}
             </Link>
         );
     }
@@ -211,9 +229,9 @@ function SidebarLink({
     );
 }
 
-function groupSidebarItems(items: Array<SidebarItem & { allowed: boolean }>) {
+function groupSidebarItems(items: Array<SidebarItem & { allowed: boolean; badge: number }>) {
     return Object.entries(
-        items.reduce<Record<string, Array<SidebarItem & { allowed: boolean }>>>(
+        items.reduce<Record<string, Array<SidebarItem & { allowed: boolean; badge: number }>>>(
             (groups, item) => {
                 groups[item.section] = [...(groups[item.section] ?? []), item];
 

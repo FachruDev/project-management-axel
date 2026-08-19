@@ -37,6 +37,8 @@ class DashboardController extends Controller
             'metrics' => [
                 'active_projects' => (clone $projectQuery)->whereIn('status', $activeStatuses)->count(),
                 'awaiting_approval' => (clone $projectQuery)->where('status', ProjectStatus::PendingApproval->value)->count(),
+                'awaiting_bast_projects' => (clone $projectQuery)->where('status', ProjectStatus::AwaitingBast->value)->count(),
+                'ready_to_close_projects' => (clone $projectQuery)->where('status', ProjectStatus::ReadyToClose->value)->count(),
                 'overdue_tasks' => (clone $taskQuery)
                     ->whereDate('plan_end_date', '<', today())
                     ->whereNotIn('status', [TaskStatus::Done->value, TaskStatus::Cancelled->value])
@@ -49,6 +51,7 @@ class DashboardController extends Controller
             'project_status_distribution' => $this->projectStatusDistribution(clone $projectQuery),
             'task_status_distribution' => $this->taskStatusDistribution(clone $taskQuery),
             'recent_rejected_projects' => $this->recentRejectedProjects(clone $projectQuery),
+            'awaiting_bast_projects' => $this->awaitingBastProjects(clone $projectQuery),
             'ready_to_close_projects' => $this->readyToCloseProjects(clone $projectQuery),
             'scope' => $user->hasAnyRole(['super_admin', 'admin']) ? 'global' : 'assigned',
         ]);
@@ -129,6 +132,22 @@ class DashboardController extends Controller
     }
 
     /**
+     * @param  Builder<Project>  $query
+     * @return array<int, array<string, mixed>>
+     */
+    private function awaitingBastProjects(Builder $query): array
+    {
+        return $query
+            ->with(['customers', 'pm'])
+            ->where('status', ProjectStatus::AwaitingBast->value)
+            ->latest('updated_at')
+            ->limit(5)
+            ->get()
+            ->map(fn (Project $project): array => $this->projectCard($project))
+            ->all();
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function projectCard(Project $project): array
@@ -140,6 +159,10 @@ class DashboardController extends Controller
             'customer' => $project->customers->first()?->name,
             'pm' => $project->pm?->name,
             'plan_end_date' => $this->dateString($project->plan_end_date),
+            'actions' => [
+                'can_upload_bast' => $project->currentStatus() === ProjectStatus::AwaitingBast,
+                'can_close' => $project->currentStatus() === ProjectStatus::ReadyToClose,
+            ],
         ];
     }
 

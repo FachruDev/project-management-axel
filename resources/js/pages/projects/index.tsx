@@ -8,14 +8,17 @@ import {
     ExternalLink,
     MapPin,
     Calendar,
+    CheckCircle2,
     Filter,
-    Plus
+    Plus,
+    UploadCloud,
 } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import bulkDeleteProjects from '@/actions/App/Http/Controllers/ProjectBulkDeleteController';
 import {
+    close,
     destroy,
     index,
     show,
@@ -31,6 +34,7 @@ import {
 } from '@/components/kanban';
 import { Modal } from '@/components/modal';
 import { PageHeader } from '@/components/page-header';
+import { ProjectBastModal } from '@/components/project-bast-modal';
 import { ProjectStatusBadge } from '@/components/project-status-badge';
 import { AppLayout } from '@/layouts/app-layout';
 import type {
@@ -94,6 +98,7 @@ export default function ProjectIndex({
     const [moveReason, setMoveReason] = useState('');
     const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
     const [moveError, setMoveError] = useState<string | null>(null);
+    const [bastProject, setBastProject] = useState<ProjectSummary | null>(null);
 
     const flash = usePage().props.flash as { success?: string | null } | undefined;
     const errors = usePage().props.errors as Record<string, string> | undefined;
@@ -111,6 +116,11 @@ export default function ProjectIndex({
         },
         [auth.user?.id, status],
     );
+
+    useEffect(() => {
+        setBoardColumns(columns);
+        setBoardMetrics(metrics);
+    }, [columns, metrics]);
 
     function submitFilters(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -168,7 +178,6 @@ export default function ProjectIndex({
             {
                 preserveScroll: true,
                 preserveState: true,
-                only: ['flash'],
                 onError: (errors) => {
                     setBoardColumns(previousColumns);
                     setBoardMetrics(previousMetrics);
@@ -219,6 +228,10 @@ export default function ProjectIndex({
         if (!window.confirm(`Delete project "${project.name}"?`)) return;
 
         router.delete(destroy.url(project.id), { preserveScroll: true });
+    }
+
+    function closeProject(project: ProjectSummary) {
+        router.post(close.url(project.id), {}, { preserveScroll: true });
     }
 
     function bulkDeleteSelectedProjects() {
@@ -334,6 +347,8 @@ export default function ProjectIndex({
                                     canManageProjects={canManageProjects}
                                     onToggleSelected={toggleProjectSelection}
                                     onDelete={deleteProject}
+                                    onUploadBast={setBastProject}
+                                    onCloseProject={closeProject}
                                 />
                             ))}
                             {column.projects.length === 0 && (
@@ -378,6 +393,12 @@ export default function ProjectIndex({
                     </form>
                 </Modal>
 
+                <ProjectBastModal
+                    open={bastProject !== null}
+                    project={bastProject}
+                    onClose={() => setBastProject(null)}
+                />
+
             </div>
         </AppLayout>
     );
@@ -390,12 +411,16 @@ function ProjectCard({
     canManageProjects,
     onToggleSelected,
     onDelete,
+    onUploadBast,
+    onCloseProject,
 }: {
     project: ProjectSummary;
     selected: boolean;
     canManageProjects: boolean;
     onToggleSelected: (projectId: number) => void;
     onDelete: (project: ProjectSummary) => void;
+    onUploadBast: (project: ProjectSummary) => void;
+    onCloseProject: (project: ProjectSummary) => void;
 }) {
     return (
         <DraggableKanbanCard id={String(project.id)} selected={selected}>
@@ -454,6 +479,34 @@ function ProjectCard({
                     )}
                 </div>
             </div>
+
+            {canManageProjects && (project.actions.can_upload_bast || project.actions.can_close) && (
+                <div
+                    className="mt-3 flex flex-wrap gap-1.5"
+                    onPointerDown={(e) => e.stopPropagation()}
+                >
+                    {project.actions.can_upload_bast && (
+                        <button
+                            type="button"
+                            onClick={() => onUploadBast(project)}
+                            className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-1 text-[10px] font-bold text-purple-800 hover:bg-purple-100"
+                        >
+                            <UploadCloud className="h-3 w-3" />
+                            <span>Upload BAST</span>
+                        </button>
+                    )}
+                    {project.actions.can_close && (
+                        <button
+                            type="button"
+                            onClick={() => onCloseProject(project)}
+                            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800 hover:bg-emerald-100"
+                        >
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>Close</span>
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Project Title */}
             <Link

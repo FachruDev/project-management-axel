@@ -215,6 +215,41 @@ class ProjectAuditBroadcastTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_project_detail_limits_audit_logs_and_endpoint_returns_next_page(): void
+    {
+        $user = $this->userWithPermissions(['view_projects']);
+        $project = Project::factory()->create(['pm_user_id' => $user->id]);
+
+        foreach (range(1, 16) as $index) {
+            app(ProjectAuditLogger::class)->log(
+                $project,
+                $user,
+                'project_updated',
+                $project,
+                ['name' => 'Old '.$index],
+                ['name' => 'New '.$index],
+            );
+        }
+
+        $this->actingAs($user)
+            ->get(route('projects.show', $project))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('projects/show')
+                ->has('project.audit_logs', 5)
+                ->where('project.audit_logs_has_more', true));
+
+        $this->actingAs($user)
+            ->getJson(route('projects.audit-logs', [
+                'project' => $project,
+                'limit' => 10,
+                'offset' => 5,
+            ]))
+            ->assertOk()
+            ->assertJsonCount(10, 'data')
+            ->assertJsonPath('has_more', true);
+    }
+
     /**
      * @param  array<int, string>  $permissions
      */

@@ -53,6 +53,16 @@ export type ProjectActions = {
     can_start: boolean;
     can_refresh: boolean;
     can_close: boolean;
+    can_upload_bast: boolean;
+};
+
+export type ProjectAttachmentPayload = {
+    id: number;
+    collection: string;
+    original_name: string;
+    mime_type: string | null;
+    url: string;
+    download_url: string;
 };
 
 export type ProjectSummary = {
@@ -110,12 +120,9 @@ export type ProjectDetail = ProjectSummary & {
         plan_end_date: string | null;
         pic: UserOption | null;
     }>;
-    attachments: Array<{
-        id: number;
-        collection: string;
-        original_name: string;
-    }>;
+    attachments: ProjectAttachmentPayload[];
     audit_logs: ProjectAuditEntry[];
+    audit_logs_has_more: boolean;
 };
 
 export type ProjectAuditEntry = {
@@ -172,7 +179,7 @@ export type PreparationProject = {
     members: PreparationMember[];
     access_rules: PreparationAccessRule[];
     tasks: PreparationTask[];
-    attachments: Record<string, Array<{ id: number; original_name: string }>>;
+    attachments: Record<string, ProjectAttachmentPayload[]>;
 };
 
 export type PreparationMember = {
@@ -351,12 +358,15 @@ export type DashboardProjectCard = {
     customer: string | null;
     pm: string | null;
     plan_end_date: string | null;
+    actions: Pick<ProjectActions, 'can_upload_bast' | 'can_close'>;
 };
 
 export type DashboardProps = {
     metrics: {
         active_projects: number;
         awaiting_approval: number;
+        awaiting_bast_projects: number;
+        ready_to_close_projects: number;
         overdue_tasks: number;
         due_this_week_tasks: number;
     };
@@ -371,6 +381,13 @@ export type DashboardProps = {
         count: number;
     }>;
     recent_rejected_projects: DashboardProjectCard[];
+    awaiting_bast_projects: DashboardProjectCard[];
     ready_to_close_projects: DashboardProjectCard[];
     scope: 'global' | 'assigned';
+};
+
+export type ProjectReminderSummary = {
+    awaiting_bast: number;
+    ready_to_close: number;
+    actionable_total: number;
 };

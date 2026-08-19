@@ -126,9 +126,13 @@ export default function ProjectPreparation({
             'ready_to_close',
             'closed',
         ].includes(project.status) || Boolean(form.data.uat_date);
+    const canEditBast = ['awaiting_bast', 'ready_to_close', 'closed'].includes(
+        project.status,
+    );
     const showBast =
-        Boolean(form.data.uat_date) ||
-        Boolean(project.attachments.uat_file?.length);
+        canEditBast ||
+        Boolean(form.data.bast_date) ||
+        Boolean(project.attachments.bast_file?.length);
 
     function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -328,6 +332,8 @@ export default function ProjectPreparation({
                         form={form}
                         showUat={showUat}
                         showBast={showBast}
+                        canEditBast={canEditBast}
+                        attachments={project.attachments}
                         canOverrideActualDates={canOverrideActualDates}
                     />
                     <MembersSection
