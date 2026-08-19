@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Download, FileText, FileSpreadsheet, Upload } from 'lucide-react';
+import { Download, Upload } from 'lucide-react';
 
 type Props = {
     exportUrl: string;
@@ -13,9 +13,7 @@ const linkClass =
 
 export function ExcelTransferActions({
     exportUrl,
-    templateUrl,
     importUrl,
-    guideUrl,
 }: Props) {
     return (
         <>
@@ -23,16 +21,6 @@ export function ExcelTransferActions({
                 <Download className="size-4" />
                 Export
             </a>
-            <a href={templateUrl} className={linkClass}>
-                <FileSpreadsheet className="size-4" />
-                Template
-            </a>
-            {guideUrl && (
-                <a href={guideUrl} className={linkClass}>
-                    <FileText className="size-4" />
-                    Guide PDF
-                </a>
-            )}
             <Link href={importUrl} className={linkClass}>
                 <Upload className="size-4" />
                 Import

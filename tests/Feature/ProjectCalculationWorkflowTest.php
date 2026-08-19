@@ -142,6 +142,7 @@ class ProjectCalculationWorkflowTest extends TestCase
             ->post(route('project-calculations.recalculate', $profile))
             ->assertSessionHas('calculation_summary', fn (array $summary): bool => $summary['calculated'] === 0
                 && $summary['skipped'] === 1
+                && $summary['skipped_projects'][0]['project_name'] === $project->name
                 && str_contains($summary['skipped_projects'][0]['reason'], 'locked'));
 
         $this->assertSame(1, ProjectIncentiveCalculation::query()->whereBelongsTo($project)->count());

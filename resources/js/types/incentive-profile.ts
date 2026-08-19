@@ -127,6 +127,7 @@ export type IncentiveCalculationSummary = {
     }>;
     skipped_projects: Array<{
         project_id: number;
+        project_name?: string;
         reason: string;
     }>;
 };

@@ -8,6 +8,8 @@ use App\Enums\ProjectStatus;
 use App\Enums\TaskStatus;
 use App\Models\Attachment;
 use App\Models\Customer;
+use App\Models\IncentiveDeliveryRule;
+use App\Models\IncentiveMandayRule;
 use App\Models\IncentivePicLevelRule;
 use App\Models\IncentiveProfile;
 use App\Models\IncentiveProjectRoleRule;
@@ -346,6 +348,7 @@ class ProjectPageWorkflowTest extends TestCase
 
         $this->assertSame(ProjectStatus::Closed, $project->status);
         $this->assertSame(now()->toDateString(), $project->actual_end_date?->toDateString());
+        $this->assertTrue($project->currentIncentiveCalculation()->exists());
     }
 
     public function test_project_status_move_starts_project_and_records_history(): void
@@ -960,18 +963,36 @@ class ProjectPageWorkflowTest extends TestCase
     {
         $profile = IncentiveProfile::factory()->create([
             'status' => IncentiveProfileStatus::Active,
+            'support_percent' => 0,
         ]);
 
         IncentiveProjectRoleRule::factory()->create([
             'incentive_profile_id' => $profile->id,
             'role_code' => 'developer',
             'role_name' => 'Developer',
+            'points' => 2,
             'is_support' => false,
         ]);
         IncentivePicLevelRule::factory()->create([
             'incentive_profile_id' => $profile->id,
             'level_code' => 'pm',
             'level_name' => 'Project Manager',
+            'points' => 4,
+        ]);
+        IncentiveMandayRule::factory()->create([
+            'incentive_profile_id' => $profile->id,
+            'min_mandays' => 1,
+            'max_mandays' => null,
+            'base_score' => 20,
+            'sort_order' => 1,
+        ]);
+        IncentiveDeliveryRule::factory()->create([
+            'incentive_profile_id' => $profile->id,
+            'name' => 'On Time',
+            'min_difference_days' => null,
+            'max_difference_days' => null,
+            'multiplier' => 1,
+            'sort_order' => 1,
         ]);
 
         return $profile->refresh();

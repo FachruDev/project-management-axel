@@ -7,6 +7,7 @@ import {
     storeVersion,
     updateStatus,
 } from '@/actions/App/Http/Controllers/IncentiveProfileController';
+import { IncentiveCalculationSummaryAlert } from '@/components/incentive-calculation-summary-alert';
 import { PageHeader } from '@/components/page-header';
 import { AppLayout } from '@/layouts/app-layout';
 import type {
@@ -146,17 +147,10 @@ export default function IncentiveProfileShow({ profile }: Props) {
                     </div>
 
                     {flash?.success && (
-                        <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-                            <div className="font-medium">{flash.success}</div>
-                            {flash.calculation_summary && (
-                                <div className="mt-2 text-emerald-800">
-                                    Calculated{' '}
-                                    {flash.calculation_summary.calculated}{' '}
-                                    project, skipped{' '}
-                                    {flash.calculation_summary.skipped}.
-                                </div>
-                            )}
-                        </section>
+                        <IncentiveCalculationSummaryAlert
+                            message={flash.success}
+                            summary={flash.calculation_summary}
+                        />
                     )}
 
                     <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

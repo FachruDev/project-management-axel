@@ -8,6 +8,7 @@ import {
     show,
     unlock as unlockCalculation,
 } from '@/actions/App/Http/Controllers/ProjectCalculationController';
+import { IncentiveCalculationSummaryAlert } from '@/components/incentive-calculation-summary-alert';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
 import { AppLayout } from '@/layouts/app-layout';
@@ -133,15 +134,10 @@ export default function ProjectCalculationIndex({
             />
 
             {flash?.success && (
-                <section className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                    <div className="font-medium">{flash.success}</div>
-                    {flash.calculation_summary && (
-                        <div className="mt-1 text-emerald-700">
-                            Calculated {flash.calculation_summary.calculated}, skipped{' '}
-                            {flash.calculation_summary.skipped}.
-                        </div>
-                    )}
-                </section>
+                <IncentiveCalculationSummaryAlert
+                    message={flash.success}
+                    summary={flash.calculation_summary}
+                />
             )}
             {errors?.calculation && (
                 <section className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

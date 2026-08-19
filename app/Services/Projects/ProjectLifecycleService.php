@@ -6,6 +6,7 @@ use App\Enums\ProjectStatus;
 use App\Exceptions\ProjectLifecycleException;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\Incentives\ProjectIncentiveCalculator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -13,6 +14,7 @@ class ProjectLifecycleService
 {
     public function __construct(
         private readonly ProjectStatusValidator $validator,
+        private readonly ProjectIncentiveCalculator $incentiveCalculator,
     ) {}
 
     /**
@@ -163,11 +165,13 @@ class ProjectLifecycleService
         $project->forceFill(['actual_end_date' => $project->actual_end_date ?? today()]);
         $this->validator->validateFor($project, ProjectStatus::Closed);
 
-        return DB::transaction(function () use ($project): Project {
+        return DB::transaction(function () use ($project, $actor): Project {
             $project->forceFill([
                 'status' => ProjectStatus::Closed,
                 'actual_end_date' => $project->actual_end_date ?? today(),
             ])->save();
+
+            $this->incentiveCalculator->calculate($project->refresh(), $actor);
 
             return $project->refresh();
         });

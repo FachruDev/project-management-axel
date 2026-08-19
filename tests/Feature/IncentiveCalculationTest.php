@@ -116,7 +116,7 @@ class IncentiveCalculationTest extends TestCase
         app(ProjectIncentiveCalculator::class)->calculate($project);
     }
 
-    public function test_batch_calculation_skips_projects_that_are_not_ready(): void
+    public function test_batch_calculation_skips_closed_projects_that_are_not_ready_and_ignores_open_projects(): void
     {
         $profile = $this->profileWithRules();
         $validProject = $this->closedProject($profile, ['name' => 'Valid Project']);
@@ -138,7 +138,9 @@ class IncentiveCalculationTest extends TestCase
         $summary = app(IncentiveProfileBatchCalculator::class)->calculateForProfile($profile);
 
         $this->assertSame(1, $summary['calculated']);
-        $this->assertSame(2, $summary['skipped']);
+        $this->assertSame(1, $summary['skipped']);
+        $this->assertSame('Missing Actual End', $summary['skipped_projects'][0]['project_name']);
+        $this->assertStringContainsString('actual end date', $summary['skipped_projects'][0]['reason']);
         $this->assertCount(1, ProjectIncentiveCalculation::all());
     }
 
@@ -157,6 +159,7 @@ class IncentiveCalculationTest extends TestCase
 
         $this->assertSame(1, $summary['calculated']);
         $this->assertSame(1, $summary['skipped']);
+        $this->assertSame('Invalid Project', $summary['skipped_projects'][0]['project_name']);
         $this->assertStringContainsString('selected profile', $summary['skipped_projects'][0]['reason']);
         $this->assertCount(1, ProjectIncentiveCalculation::all());
     }

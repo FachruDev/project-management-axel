@@ -3,12 +3,17 @@
 namespace Tests\Feature;
 
 use App\Enums\AttachmentCollection;
+use App\Enums\IncentiveProfileStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\TaskStatus;
 use App\Exceptions\ProjectLifecycleException;
 use App\Models\Attachment;
 use App\Models\Customer;
+use App\Models\IncentiveDeliveryRule;
+use App\Models\IncentiveMandayRule;
+use App\Models\IncentivePicLevelRule;
 use App\Models\IncentiveProfile;
+use App\Models\IncentiveProjectRoleRule;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\ProjectTask;
@@ -230,10 +235,52 @@ class ProjectLifecycleServiceTest extends TestCase
         ]);
         $this->addAttachment($project, AttachmentCollection::BastFile);
 
-        $project = app(ProjectLifecycleService::class)->close($project, User::factory()->create());
+        $actor = User::factory()->create();
+
+        $project = app(ProjectLifecycleService::class)->close($project, $actor);
 
         $this->assertSame(ProjectStatus::Closed, $project->status);
         $this->assertTrue($project->actual_end_date->isSameDay(today()));
+
+        $calculation = $project->currentIncentiveCalculation()->firstOrFail();
+
+        $this->assertSame($actor->id, $calculation->calculated_by);
+    }
+
+    public function test_close_rolls_back_when_incentive_calculation_is_not_ready(): void
+    {
+        $project = $this->ongoingProjectWithUat([
+            'status' => ProjectStatus::ReadyToClose,
+            'bast_date' => now()->toDateString(),
+        ]);
+        $member = $project->members()->firstOrFail();
+        $member->forceFill([
+            'incentive_project_role_rule_id' => null,
+            'incentive_pic_level_rule_id' => null,
+            'project_role_code' => null,
+            'project_role_name' => null,
+            'pic_level_code' => null,
+            'pic_level_name' => null,
+        ])->save();
+
+        ProjectTask::factory()->create([
+            'project_id' => $project->id,
+            'project_member_id' => $member->id,
+            'task_type_id' => TaskType::factory()->create()->id,
+            'status' => TaskStatus::Done,
+        ]);
+        $this->addAttachment($project, AttachmentCollection::BastFile);
+
+        $this->expectException(ValidationException::class);
+
+        try {
+            app(ProjectLifecycleService::class)->close($project, User::factory()->create());
+        } finally {
+            $project->refresh();
+
+            $this->assertSame(ProjectStatus::ReadyToClose, $project->status);
+            $this->assertFalse($project->currentIncentiveCalculation()->exists());
+        }
     }
 
     /**
@@ -242,8 +289,11 @@ class ProjectLifecycleServiceTest extends TestCase
     private function preparedProject(array $overrides = []): Project
     {
         $pm = User::factory()->create();
+        $profile = $this->profileWithRules();
+        $roleRule = $profile->projectRoleRules()->firstOrFail();
+        $picRule = $profile->picLevelRules()->firstOrFail();
         $project = Project::factory()->create([
-            'incentive_profile_id' => IncentiveProfile::factory()->create()->id,
+            'incentive_profile_id' => $profile->id,
             'pm_user_id' => $pm->id,
             'request_user_id' => User::factory()->create()->id,
             'location' => 'Jakarta',
@@ -258,10 +308,56 @@ class ProjectLifecycleServiceTest extends TestCase
         ProjectMember::factory()->create([
             'project_id' => $project->id,
             'user_id' => $pm->id,
+            'incentive_project_role_rule_id' => $roleRule->id,
+            'incentive_pic_level_rule_id' => $picRule->id,
+            'project_role_code' => $roleRule->role_code,
+            'project_role_name' => $roleRule->role_name,
+            'pic_level_code' => $picRule->level_code,
+            'pic_level_name' => $picRule->level_name,
+            'is_support' => false,
         ]);
         $this->addAttachment($project, AttachmentCollection::UrsFile);
 
         return $project->refresh();
+    }
+
+    private function profileWithRules(): IncentiveProfile
+    {
+        $profile = IncentiveProfile::factory()->create([
+            'status' => IncentiveProfileStatus::Active,
+            'support_percent' => 0,
+        ]);
+
+        IncentiveMandayRule::factory()->create([
+            'incentive_profile_id' => $profile->id,
+            'min_mandays' => 1,
+            'max_mandays' => null,
+            'base_score' => 20,
+            'sort_order' => 1,
+        ]);
+        IncentivePicLevelRule::factory()->create([
+            'incentive_profile_id' => $profile->id,
+            'level_code' => 'manager',
+            'level_name' => 'Manager',
+            'points' => 4,
+        ]);
+        IncentiveProjectRoleRule::factory()->create([
+            'incentive_profile_id' => $profile->id,
+            'role_code' => 'pm',
+            'role_name' => 'PM',
+            'points' => 2,
+            'is_support' => false,
+        ]);
+        IncentiveDeliveryRule::factory()->create([
+            'incentive_profile_id' => $profile->id,
+            'name' => 'On Time',
+            'min_difference_days' => null,
+            'max_difference_days' => null,
+            'multiplier' => 1,
+            'sort_order' => 1,
+        ]);
+
+        return $profile->refresh();
     }
 
     /**

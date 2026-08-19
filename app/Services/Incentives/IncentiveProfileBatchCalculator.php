@@ -3,6 +3,7 @@
 namespace App\Services\Incentives;
 
 use App\Enums\IncentiveProfileStatus;
+use App\Enums\ProjectStatus;
 use App\Models\IncentiveProfile;
 use App\Models\Project;
 use App\Models\ProjectIncentiveCalculation;
@@ -21,7 +22,7 @@ class IncentiveProfileBatchCalculator
      *     calculated: int,
      *     skipped: int,
      *     calculated_projects: array<int, array{project_id: int, calculation_id: int}>,
-     *     skipped_projects: array<int, array{project_id: int, reason: string}>
+     *     skipped_projects: array<int, array{project_id: int, project_name: string, reason: string}>
      * }
      *
      * @throws ValidationException
@@ -41,6 +42,7 @@ class IncentiveProfileBatchCalculator
 
         Project::query()
             ->whereBelongsTo($profile, 'incentiveProfile')
+            ->where('status', ProjectStatus::Closed->value)
             ->with('currentIncentiveCalculation')
             ->latest()
             ->lazyById()
@@ -50,6 +52,7 @@ class IncentiveProfileBatchCalculator
                 if ($currentCalculation instanceof ProjectIncentiveCalculation && $currentCalculation->isLocked()) {
                     $skippedProjects[] = [
                         'project_id' => (int) $project->id,
+                        'project_name' => $project->name,
                         'reason' => 'Project calculation is locked and cannot be recalculated.',
                     ];
 
@@ -66,6 +69,7 @@ class IncentiveProfileBatchCalculator
                 } catch (ValidationException $exception) {
                     $skippedProjects[] = [
                         'project_id' => (int) $project->id,
+                        'project_name' => $project->name,
                         'reason' => $this->firstValidationMessage($exception),
                     ];
                 }
