@@ -422,13 +422,16 @@ function ProjectCard({
     onUploadBast: (project: ProjectSummary) => void;
     onCloseProject: (project: ProjectSummary) => void;
 }) {
+    const isClosed = project.status === 'closed';
+    const canSelectProject = canManageProjects && !isClosed;
+
     return (
         <DraggableKanbanCard id={String(project.id)} selected={selected}>
             {/* onPointerDown={(e) => e.stopPropagation()} SANGAT PENTING untuk mencegah event klik tembus memicu fungsi drag dnd-kit */}
 
             <div className="ml-8 mt-1 flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
-                    {canManageProjects && (
+                    {canSelectProject && (
                         <input
                             type="checkbox"
                             checked={selected}
@@ -453,13 +456,15 @@ function ProjectCard({
                     >
                         <ExternalLink className="h-3.5 w-3.5" />
                     </Link>
-                    <Link
-                        href={preparationShow.url(project.id)}
-                        title="Edit Project"
-                        className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-primary"
-                    >
-                        <Pencil className="h-3.5 w-3.5" />
-                    </Link>
+                    {!isClosed && (
+                        <Link
+                            href={preparationShow.url(project.id)}
+                            title="Edit Project"
+                            className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-primary"
+                        >
+                            <Pencil className="h-3.5 w-3.5" />
+                        </Link>
+                    )}
                     <Link
                         href={taskBoardIndex.url({ query: { project_id: project.id } })}
                         title="Task Board"
@@ -467,7 +472,7 @@ function ProjectCard({
                     >
                         <CheckSquare className="h-3.5 w-3.5" />
                     </Link>
-                    {canManageProjects && (
+                    {canManageProjects && !isClosed && (
                         <button
                             type="button"
                             title="Delete Project"

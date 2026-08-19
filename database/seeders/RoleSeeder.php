@@ -34,6 +34,8 @@ class RoleSeeder extends Seeder
             'manage_tasks',
             'view_tasks',
             'manage_customers',
+            'view_my_incentives',
+            'view_crm',
         ];
 
         $roles = [

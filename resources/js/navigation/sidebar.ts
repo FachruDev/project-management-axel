@@ -6,6 +6,7 @@ import {
     CheckCircle2,
     CheckSquare,
     CircleDollarSign,
+    Handshake,
     Users,
     Building2,
     CalendarDays,
@@ -19,6 +20,8 @@ import { index as customersIndex } from '@/actions/App/Http/Controllers/Customer
 import { index as departmentsIndex } from '@/actions/App/Http/Controllers/DepartmentController';
 import { index as holidaysIndex } from '@/actions/App/Http/Controllers/HolidayController';
 import { index as incentiveProfilesIndex } from '@/actions/App/Http/Controllers/IncentiveProfileController';
+import IncentiveController from '@/actions/App/Http/Controllers/IncentiveController';
+import MyIncentiveController from '@/actions/App/Http/Controllers/MyIncentiveController';
 import { index as projectApprovalsIndex } from '@/actions/App/Http/Controllers/ProjectApprovalController';
 import { index as projectCalculationsIndex } from '@/actions/App/Http/Controllers/ProjectCalculationController';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/ProjectController';
@@ -27,6 +30,7 @@ import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleControll
 import tasksIndex from '@/actions/App/Http/Controllers/TaskBoardController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
 import { index as workingDayRulesIndex } from '@/actions/App/Http/Controllers/WorkingDayRuleController';
+import { index as crmIndex } from '@/actions/App/Http/Controllers/CrmController';
 import { home } from '@/routes';
 
 export type SidebarItem = {
@@ -79,11 +83,35 @@ export const sidebarItems: SidebarItem[] = [
         status: 'ready',
     },
     {
+        label: 'My Incentive',
+        section: 'Incentive',
+        icon: CircleDollarSign,
+        href: MyIncentiveController.url(),
+        permission: 'view_my_incentives',
+        status: 'ready',
+    },
+    {
+        label: 'Incentives',
+        section: 'Incentive',
+        icon: Calculator,
+        href: IncentiveController.url(),
+        permission: 'view_all_incentives',
+        status: 'ready',
+    },
+    {
         label: 'Tasks',
         section: 'Project',
         icon: CheckSquare,
         href: tasksIndex.url(),
         permission: 'view_tasks',
+        status: 'ready',
+    },
+    {
+        label: 'CRM',
+        section: 'Workspace',
+        icon: Handshake,
+        href: crmIndex.url(),
+        permission: 'view_crm',
         status: 'ready',
     },
     {

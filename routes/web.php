@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AttachmentController;
+use App\Http\Controllers\CrmController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerExcelController;
 use App\Http\Controllers\DashboardController;
@@ -8,7 +9,9 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\HolidayExcelController;
 use App\Http\Controllers\ImportPreviewController;
+use App\Http\Controllers\IncentiveController;
 use App\Http\Controllers\IncentiveProfileController;
+use App\Http\Controllers\MyIncentiveController;
 use App\Http\Controllers\ProjectApprovalController;
 use App\Http\Controllers\ProjectAuditLogController;
 use App\Http\Controllers\ProjectBastController;
@@ -203,6 +206,19 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::patch('project-calculations/{project_incentive_calculation}/unlock', [ProjectCalculationController::class, 'unlock'])
         ->middleware('can:unlock_project_incentives')
         ->name('project-calculations.unlock');
+
+    Route::get('my-incentives', MyIncentiveController::class)
+        ->middleware('can:view_my_incentives')
+        ->name('my-incentives.index');
+    Route::get('incentives', IncentiveController::class)
+        ->middleware('can:view_all_incentives')
+        ->name('incentives.index');
+    Route::get('crm', [CrmController::class, 'index'])
+        ->middleware('can:view_crm')
+        ->name('crm.index');
+    Route::get('crm/customers/{customer}', [CrmController::class, 'show'])
+        ->middleware('can:view_crm')
+        ->name('crm.customers.show');
 
     Route::middleware('can:manage_incentive_profiles')->group(function (): void {
         Route::patch('incentive-profiles/{incentive_profile}/status', [IncentiveProfileController::class, 'updateStatus'])

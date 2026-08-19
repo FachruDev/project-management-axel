@@ -22,6 +22,11 @@ class PermissionSeeder extends Seeder
                 'view_project_incentives',
                 'lock_project_incentives',
                 'unlock_project_incentives',
+                'view_my_incentives',
+                'view_all_incentives',
+            ],
+            'crm' => [
+                'view_crm',
             ],
             'project' => [
                 'manage_projects',

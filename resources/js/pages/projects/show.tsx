@@ -54,6 +54,7 @@ export default function ProjectShow({ project }: Props) {
     const [auditLogs, setAuditLogs] = useState(project.audit_logs);
     const [auditHasMore, setAuditHasMore] = useState(project.audit_logs_has_more);
     const [auditLoading, setAuditLoading] = useState(false);
+    const auditExpanded = auditLogs.length > project.audit_logs.length;
 
     const doneTasks = project.tasks.filter((task) => task.status === 'done').length;
     const progress =
@@ -99,6 +100,11 @@ export default function ProjectShow({ project }: Props) {
         } finally {
             setAuditLoading(false);
         }
+    }
+
+    function collapseAuditLogs() {
+        setAuditLogs(project.audit_logs);
+        setAuditHasMore(project.audit_logs_has_more);
     }
 
     return (
@@ -320,16 +326,27 @@ export default function ProjectShow({ project }: Props) {
                                     </tbody>
                                 </table>
                             </div>
-                            {auditHasMore && (
-                                <div className="mt-3 flex justify-center">
-                                    <button
-                                        type="button"
-                                        onClick={loadMoreAuditLogs}
-                                        disabled={auditLoading}
-                                        className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        {auditLoading ? 'Loading...' : 'Load 10 more'}
-                                    </button>
+                            {(auditHasMore || auditExpanded) && (
+                                <div className="mt-3 flex justify-center gap-2">
+                                    {auditExpanded && (
+                                        <button
+                                            type="button"
+                                            onClick={collapseAuditLogs}
+                                            className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                        >
+                                            Collapse
+                                        </button>
+                                    )}
+                                    {auditHasMore && (
+                                        <button
+                                            type="button"
+                                            onClick={loadMoreAuditLogs}
+                                            disabled={auditLoading}
+                                            className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {auditLoading ? 'Loading...' : 'Load 10 more'}
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </Panel>
