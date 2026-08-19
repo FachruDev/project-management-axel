@@ -49,6 +49,7 @@ export type CrmProjectRow = {
         id: number;
         is_locked: boolean;
         total_incentive: string;
+        delivery_multiplier: string;
         calculated_at: string | null;
         locked_at: string | null;
         delivery_status: string;

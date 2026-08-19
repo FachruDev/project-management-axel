@@ -53,7 +53,7 @@ export default function CrmShow({
                 <Metric label="Projects" value={String(customer.summary.projects_count)} />
                 <Metric label="Active" value={String(customer.summary.active_projects_count)} />
                 <Metric label="Closed" value={String(customer.summary.closed_projects_count)} />
-                <Metric label="Locked Incentive" value={formatCurrency(customer.summary.locked_incentive_total)} />
+                <Metric label="Locked Score" value={formatScore(customer.summary.locked_incentive_total)} />
             </section>
 
             <section className="grid gap-4 lg:grid-cols-[360px_1fr]">
@@ -185,10 +185,10 @@ function ProjectRow({ project }: { project: CrmProjectRow }) {
                 {project.calculation ? (
                     <>
                         <div className="font-semibold text-slate-950">
-                            {formatCurrency(project.calculation.total_incentive)}
+                            {formatScore(project.calculation.total_incentive)}
                         </div>
                         <div className="text-xs text-slate-500">
-                            {project.calculation.is_locked ? 'Locked' : 'Open'} / {project.calculation.delivery_status || '-'}
+                            {project.calculation.is_locked ? 'Locked' : 'Open'} / {project.calculation.delivery_status || '-'} / x{formatScore(project.calculation.delivery_multiplier)}
                         </div>
                     </>
                 ) : (
@@ -237,14 +237,13 @@ function Info({ label, value }: { label: string; value: string }) {
     );
 }
 
-function formatCurrency(value: string | number | null) {
+function formatScore(value: string | number | null) {
     if (value === null || value === '') {
         return '-';
     }
 
     return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        maximumFractionDigits: 0,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
     }).format(Number(value));
 }

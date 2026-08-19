@@ -257,6 +257,7 @@ class CrmWorkspaceService
                 'id' => $calculation->id,
                 'is_locked' => $calculation->isLocked(),
                 'total_incentive' => $calculation->total_incentive,
+                'delivery_multiplier' => $calculation->delivery_multiplier,
                 'calculated_at' => $this->dateTimeString($calculation->calculated_at),
                 'locked_at' => $this->dateTimeString($calculation->locked_at),
                 'delivery_status' => $this->deliveryStatusValue($calculation->delivery_status),

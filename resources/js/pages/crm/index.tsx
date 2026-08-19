@@ -29,7 +29,7 @@ export default function CrmIndex({ customers, filters, options }: CrmIndexProps)
             <PageHeader
                 eyebrow="CRM"
                 title="Customer Workspace"
-                description="Customer 360 view for projects, status, PM, and locked incentive summaries."
+                description="Customer 360 view for projects, status, PM, and locked score summaries."
             />
 
             <form
@@ -69,7 +69,7 @@ export default function CrmIndex({ customers, filters, options }: CrmIndexProps)
                                 <th className="px-4 py-3">Customer</th>
                                 <th className="px-4 py-3">Projects</th>
                                 <th className="px-4 py-3">Last Update</th>
-                                <th className="px-4 py-3 text-right">Locked Incentive</th>
+                                <th className="px-4 py-3 text-right">Locked Score</th>
                                 <th className="px-4 py-3 text-right">Action</th>
                             </tr>
                         </thead>
@@ -117,7 +117,7 @@ function CustomerRow({ customer }: { customer: CrmCustomerRow }) {
             </td>
             <td className="px-4 py-3 text-slate-600">{customer.last_project_update ?? '-'}</td>
             <td className="px-4 py-3 text-right font-semibold text-slate-950">
-                {formatCurrency(customer.locked_incentive_total)}
+                {formatScore(customer.locked_incentive_total)}
             </td>
             <td className="px-4 py-3 text-right">
                 <Link
@@ -131,14 +131,13 @@ function CustomerRow({ customer }: { customer: CrmCustomerRow }) {
     );
 }
 
-function formatCurrency(value: string | number | null) {
+function formatScore(value: string | number | null) {
     if (value === null || value === '') {
         return '-';
     }
 
     return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        maximumFractionDigits: 0,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
     }).format(Number(value));
 }

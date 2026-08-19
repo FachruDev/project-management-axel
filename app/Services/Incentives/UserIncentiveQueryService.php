@@ -126,7 +126,7 @@ class UserIncentiveQueryService
      */
     private function summary(Builder $query): array
     {
-        $baseQuery = clone $query;
+        $baseQuery = (clone $query)->reorder();
 
         return [
             'items_count' => (clone $baseQuery)->count(),
@@ -145,6 +145,7 @@ class UserIncentiveQueryService
     private function employeeOptions(): array
     {
         $userIds = $this->baseQuery($this->emptyFilters())
+            ->reorder()
             ->select('employee_id')
             ->whereNotNull('employee_id')
             ->distinct()

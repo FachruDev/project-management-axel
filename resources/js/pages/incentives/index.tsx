@@ -55,7 +55,7 @@ export default function IncentiveIndex({
             />
 
             <section className="grid gap-4 md:grid-cols-4">
-                <Metric label="Total Incentive" value={formatCurrency(summary.total_incentive)} />
+                <Metric label="Total Final Score" value={formatScore(summary.total_incentive)} />
                 <Metric label="Employees" value={String(summary.employees_count)} />
                 <Metric label="Projects" value={String(summary.projects_count)} />
                 <Metric label="Items" value={String(summary.items_count)} />
@@ -118,7 +118,7 @@ export default function IncentiveIndex({
                                 <th className="px-4 py-3">Role</th>
                                 <th className="px-4 py-3">Profile</th>
                                 <th className="px-4 py-3">Locked At</th>
-                                <th className="px-4 py-3 text-right">Incentive</th>
+                                <th className="px-4 py-3 text-right">Final Score</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -188,7 +188,10 @@ function IncentiveRow({ item }: { item: IncentiveItem }) {
                 )}
             </td>
             <td className="px-4 py-3 text-right font-semibold text-slate-950">
-                {formatCurrency(item.final_incentive)}
+                {formatScore(item.final_incentive)}
+                <div className="text-xs font-normal text-slate-500">
+                    Base {formatScore(item.base_incentive)} x {formatScore(item.delivery_multiplier)}
+                </div>
             </td>
         </tr>
     );
@@ -226,14 +229,13 @@ function Metric({ label, value }: { label: string; value: string }) {
     );
 }
 
-function formatCurrency(value: string | number | null) {
+function formatScore(value: string | number | null) {
     if (value === null || value === '') {
         return '-';
     }
 
     return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        maximumFractionDigits: 0,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
     }).format(Number(value));
 }
