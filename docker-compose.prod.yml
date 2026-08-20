@@ -1,0 +1,67 @@
+services:
+  app:
+    image: project-management-app:prod
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    env_file:
+      - .env.docker.prod
+    environment:
+      CONTAINER_ROLE: app
+    volumes:
+      - app_storage_prod:/var/www/html/storage
+      - app_bootstrap_cache_prod:/var/www/html/bootstrap/cache
+    restart: unless-stopped
+
+  web:
+    image: project-management-web:prod
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+    volumes:
+      - app_storage_prod:/var/www/html/storage:ro
+    restart: unless-stopped
+
+  queue:
+    image: project-management-app:prod
+    env_file:
+      - .env.docker.prod
+    environment:
+      CONTAINER_ROLE: queue
+      APP_WAIT_FOR_MIGRATIONS: "true"
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--timeout=90"]
+    depends_on:
+      app:
+        condition: service_started
+    volumes:
+      - app_storage_prod:/var/www/html/storage
+      - app_bootstrap_cache_prod:/var/www/html/bootstrap/cache
+    restart: unless-stopped
+
+  reverb:
+    image: project-management-app:prod
+    env_file:
+      - .env.docker.prod
+    environment:
+      CONTAINER_ROLE: reverb
+      APP_WAIT_FOR_MIGRATIONS: "true"
+    command: ["php", "artisan", "reverb:start"]
+    depends_on:
+      app:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    volumes:
+      - app_storage_prod:/var/www/html/storage
+      - app_bootstrap_cache_prod:/var/www/html/bootstrap/cache
+    restart: unless-stopped
+
+volumes:
+  app_storage_prod:
+  app_bootstrap_cache_prod:

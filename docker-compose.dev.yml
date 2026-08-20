@@ -1,0 +1,90 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: project_management
+      POSTGRES_USER: project_management
+      POSTGRES_PASSWORD: project_management
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    image: project-management-app:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    env_file:
+      - .env.docker.dev
+    environment:
+      CONTAINER_ROLE: app
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - app_storage_dev:/var/www/html/storage
+      - app_bootstrap_cache_dev:/var/www/html/bootstrap/cache
+    restart: unless-stopped
+
+  web:
+    image: project-management-web:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+    depends_on:
+      - app
+    ports:
+      - "8000:80"
+    volumes:
+      - app_storage_dev:/var/www/html/storage:ro
+    restart: unless-stopped
+
+  queue:
+    image: project-management-app:dev
+    env_file:
+      - .env.docker.dev
+    environment:
+      CONTAINER_ROLE: queue
+      APP_WAIT_FOR_MIGRATIONS: "true"
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--timeout=90"]
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_started
+    volumes:
+      - app_storage_dev:/var/www/html/storage
+      - app_bootstrap_cache_dev:/var/www/html/bootstrap/cache
+    restart: unless-stopped
+
+  reverb:
+    image: project-management-app:dev
+    env_file:
+      - .env.docker.dev
+    environment:
+      CONTAINER_ROLE: reverb
+      APP_WAIT_FOR_MIGRATIONS: "true"
+    command: ["php", "artisan", "reverb:start"]
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    volumes:
+      - app_storage_dev:/var/www/html/storage
+      - app_bootstrap_cache_dev:/var/www/html/bootstrap/cache
+    restart: unless-stopped
+
+volumes:
+  pgdata_dev:
+  app_storage_dev:
+  app_bootstrap_cache_dev:
