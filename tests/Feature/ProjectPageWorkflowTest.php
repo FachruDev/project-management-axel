@@ -293,6 +293,28 @@ class ProjectPageWorkflowTest extends TestCase
         $this->assertNotNull($project->actual_start_date);
     }
 
+    public function test_submit_approval_reports_project_error_when_imported_project_has_no_urs_file(): void
+    {
+        Storage::fake('local');
+
+        $manager = $this->userWithPermissions(['manage_projects']);
+        $project = $this->preparedProject($manager);
+
+        $project->attachments()
+            ->where('collection', AttachmentCollection::UrsFile)
+            ->delete();
+
+        $this->actingAs($manager)
+            ->post(route('projects.submit-approval', $project))
+            ->assertRedirect()
+            ->assertSessionHasErrors([
+                'project' => 'Project data is not complete: URS file is required.',
+                'urs_file' => 'URS file is required.',
+            ]);
+
+        $this->assertSame(ProjectStatus::Draft, $project->refresh()->status);
+    }
+
     public function test_refresh_status_promotes_to_awaiting_bast_ready_to_close_and_close_sets_actual_end(): void
     {
         Storage::fake('local');

@@ -1,4 +1,5 @@
 import { router, useForm, usePage } from '@inertiajs/react';
+import { Trash2, SquarePen, CirclePlus } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
 import {
@@ -122,9 +123,9 @@ export default function DepartmentIndex({ departments, filters }: Props) {
                     <button
                         type="button"
                         onClick={openCreate}
-                        className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                        className="rounded-md gap-2 inline-flex bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
                     >
-                        New Department
+                        <CirclePlus className="size-5" /> New Department
                     </button>
                 }
             />
@@ -171,12 +172,12 @@ export default function DepartmentIndex({ departments, filters }: Props) {
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
-                            <tr>
+                            <tr className="text-center">
                                 <th className="px-4 py-3">Department</th>
                                 <th className="px-4 py-3">Description</th>
                                 <th className="px-4 py-3">Users</th>
                                 <th className="px-4 py-3">Status</th>
-                                <th className="px-4 py-3 text-right">Action</th>
+                                <th className="px-4 py-3">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -204,16 +205,16 @@ export default function DepartmentIndex({ departments, filters }: Props) {
                                             <button
                                                 type="button"
                                                 onClick={() => openEdit(department)}
-                                                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                                                className="rounded-md gap-2 inline-flex border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
                                             >
-                                                Edit
+                                                <SquarePen className="size-4" /> Edit
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => deleteDepartment(department)}
-                                                className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                                                className="rounded-md gap-2 inline-flex border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
                                             >
-                                                Delete
+                                                <Trash2 className="size-4" /> Delete
                                             </button>
                                         </div>
                                     </td>

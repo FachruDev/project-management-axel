@@ -1,4 +1,5 @@
 import { Link, router } from '@inertiajs/react';
+import { Eye } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { index, show } from '@/actions/App/Http/Controllers/CrmController';
@@ -65,12 +66,12 @@ export default function CrmIndex({ customers, filters, options }: CrmIndexProps)
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
-                            <tr>
+                            <tr className="text-center">
                                 <th className="px-4 py-3">Customer</th>
                                 <th className="px-4 py-3">Projects</th>
                                 <th className="px-4 py-3">Last Update</th>
-                                <th className="px-4 py-3 text-right">Locked Score</th>
-                                <th className="px-4 py-3 text-right">Action</th>
+                                <th className="px-4 py-3">Locked Score</th>
+                                <th className="px-4 py-3">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -122,9 +123,9 @@ function CustomerRow({ customer }: { customer: CrmCustomerRow }) {
             <td className="px-4 py-3 text-right">
                 <Link
                     href={show.url(customer.id)}
-                    className="inline-flex rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                    Detail
+                    <Eye className="size-4" /> Detail
                 </Link>
             </td>
         </tr>

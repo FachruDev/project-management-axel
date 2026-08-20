@@ -234,7 +234,7 @@ export default function ProjectQuotationForm({
                             <textarea
                                 value={form.data.customer_address}
                                 onChange={(event) => form.setData('customer_address', event.target.value)}
-                                className={`${inputClass} min-h-[116px] resize-none`}
+                                className={`${inputClass} min-h-29 resize-none`}
                                 placeholder="Full customer address..."
                             />
                         </Field>
@@ -288,17 +288,17 @@ export default function ProjectQuotationForm({
 
                     <div className="overflow-x-auto p-5 pt-0">
                         {/* Tabel dengan min-width untuk mencegah kolom menyempit berlebihan */}
-                        <table className="mt-4 min-w-[900px] w-full text-sm">
+                        <table className="mt-4 min-w-225 w-full text-sm">
                             <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-600 rounded-t-md">
-                                <tr>
-                                    <th className="px-3 py-3 w-12 text-center rounded-tl-md">#</th>
-                                    <th className="px-3 py-3 min-w-[250px]">Description</th>
+                                <tr className="text-center">
+                                    <th className="px-3 py-3 w-12 rounded-tl-md">#</th>
+                                    <th className="px-3 py-3 min-w-62.5">Description</th>
                                     <th className="px-3 py-3 w-32">Unit</th>
                                     <th className="px-3 py-3 w-28">Qty</th>
                                     <th className="px-3 py-3 w-36">Unit Price</th>
                                     <th className="px-3 py-3 w-24">Disc %</th>
                                     <th className="px-3 py-3 w-40">Manual Amount</th>
-                                    <th className="px-3 py-3 w-16 text-center rounded-tr-md"></th>
+                                    <th className="px-3 py-3 w-16 rounded-tr-md"></th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -422,7 +422,7 @@ export default function ProjectQuotationForm({
                                 <textarea
                                     value={form.data.description}
                                     onChange={(event) => form.setData('description', event.target.value)}
-                                    className={`${inputClass} min-h-[80px]`}
+                                    className={`${inputClass} min-h-20`}
                                     placeholder="Internal notes..."
                                 />
                             </Field>
@@ -430,7 +430,7 @@ export default function ProjectQuotationForm({
                                 <textarea
                                     value={form.data.note}
                                     onChange={(event) => form.setData('note', event.target.value)}
-                                    className={`${inputClass} min-h-[80px]`}
+                                    className={`${inputClass} min-h-20`}
                                     placeholder="Notes visible to customer..."
                                 />
                             </Field>
@@ -449,7 +449,7 @@ export default function ProjectQuotationForm({
                                     <input
                                         value={form.data.ppn_pph_percent}
                                         onChange={(event) => form.setData('ppn_pph_percent', event.target.value)}
-                                        className={`${inputClass} w-1/2 min-w-[150px] font-medium bg-white`}
+                                        className={`${inputClass} w-1/2 min-w-37.5 font-medium bg-white`}
                                         inputMode="decimal"
                                         placeholder="0"
                                     />
@@ -472,7 +472,7 @@ export default function ProjectQuotationForm({
                         <button
                             type="submit"
                             disabled={form.processing}
-                            className="mt-8 flex w-full items-center justify-center rounded-md bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:bg-slate-400"
+                            className="mt-8 flex w-full items-center justify-center rounded-md bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:bg-slate-400"
                         >
                             {form.processing ? (
                                 <span className="flex items-center gap-2">
@@ -523,7 +523,7 @@ function FieldError({ error }: { error?: string }) {
     if (!error) {
         return null;
     }
-    
+
     return <span className="text-xs font-medium text-red-500">{error}</span>;
 }
 

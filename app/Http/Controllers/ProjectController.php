@@ -27,6 +27,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -153,6 +154,8 @@ class ProjectController extends Controller
 
         try {
             $project = $this->lifecycleService->submitForApproval($project, $actor);
+        } catch (ValidationException $exception) {
+            return back()->withErrors($this->projectValidationErrors($exception));
         } catch (ProjectLifecycleException $exception) {
             return back()->withErrors(['project' => $exception->getMessage()]);
         }
@@ -179,6 +182,8 @@ class ProjectController extends Controller
 
         try {
             $project = $this->lifecycleService->resubmit($project, $actor);
+        } catch (ValidationException $exception) {
+            return back()->withErrors($this->projectValidationErrors($exception));
         } catch (ProjectLifecycleException $exception) {
             return back()->withErrors(['project' => $exception->getMessage()]);
         }
@@ -303,6 +308,27 @@ class ProjectController extends Controller
             'members_count' => $project->members_count ?? 0,
             'actions' => $this->actions($project),
         ];
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function projectValidationErrors(ValidationException $exception): array
+    {
+        $errors = $exception->errors();
+        $messages = collect($errors)
+            ->flatten()
+            ->filter(fn (mixed $message): bool => filled($message))
+            ->map(fn (mixed $message): string => (string) $message)
+            ->values();
+
+        $errors['project'] = [
+            $messages->isEmpty()
+                ? 'Project data is not complete.'
+                : 'Project data is not complete: '.$messages->implode(' '),
+        ];
+
+        return $errors;
     }
 
     /**

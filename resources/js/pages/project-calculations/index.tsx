@@ -1,4 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
+import { Eye, LockOpen, Lock, RotateCcw } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import {
@@ -124,9 +125,9 @@ export default function ProjectCalculationIndex({
                                 type="button"
                                 onClick={recalculateSelectedProfile}
                                 disabled={!recalculateProfileId}
-                                className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:bg-slate-400"
+                                className="rounded-md gap-2 inline-flex bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:bg-slate-400"
                             >
-                                Recalculate Profile
+                                <RotateCcw className="size-5" /> Recalculate
                             </button>
                         </div>
                     )
@@ -190,13 +191,13 @@ export default function ProjectCalculationIndex({
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
-                            <tr>
+                            <tr className="text-center">
                                 <th className="px-4 py-3">Project</th>
                                 <th className="px-4 py-3">Profile</th>
                                 <th className="px-4 py-3">Calculation</th>
                                 <th className="px-4 py-3">Total</th>
                                 <th className="px-4 py-3">Status</th>
-                                <th className="px-4 py-3 text-right">Action</th>
+                                <th className="px-4 py-3">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -277,27 +278,27 @@ function ProjectRow({
                     {calculation && project.actions.can_view && (
                         <Link
                             href={show.url(calculation.id)}
-                            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                            className="rounded-md border gap-2 inline-flex border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
                         >
-                            Detail
+                             <Eye className="size-4" /> Detail
                         </Link>
                     )}
                     {calculation && project.actions.can_lock && (
                         <button
                             type="button"
                             onClick={() => onLock(calculation)}
-                            className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
+                            className="rounded-md gap-2 inline-flex bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
                         >
-                            Lock
+                            <Lock className="size-4" /> Lock
                         </button>
                     )}
                     {calculation && project.actions.can_unlock && (
                         <button
                             type="button"
                             onClick={() => onUnlock(calculation)}
-                            className="rounded-md border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
+                            className="rounded-md gap-2 inline-flex border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
                         >
-                            Unlock
+                            <LockOpen className="size-4" /> Unlock
                         </button>
                     )}
                 </div>

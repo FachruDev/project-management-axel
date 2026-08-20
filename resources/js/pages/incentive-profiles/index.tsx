@@ -1,4 +1,5 @@
 import { Link, router } from '@inertiajs/react';
+import { Eye, SquarePen, CirclePlus } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import {
@@ -70,9 +71,9 @@ export default function IncentiveProfileIndex({
                 actions={
                     <Link
                         href={create.url()}
-                        className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                        className="rounded-md gap-2 inline-flex bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
                     >
-                        New Profile
+                        <CirclePlus className="size-5" /> New Profile
                     </Link>
                 }
             />
@@ -111,7 +112,7 @@ export default function IncentiveProfileIndex({
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
-                            <tr>
+                            <tr className="text-center">
                                 <th className="px-4 py-3">Profile</th>
                                 <th className="px-4 py-3">Version</th>
                                 <th className="px-4 py-3">Effective</th>
@@ -119,7 +120,7 @@ export default function IncentiveProfileIndex({
                                 <th className="px-4 py-3">Rules</th>
                                 <th className="px-4 py-3">Usage</th>
                                 <th className="px-4 py-3">Status</th>
-                                <th className="px-4 py-3 text-right">Action</th>
+                                <th className="px-4 py-3">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -168,16 +169,16 @@ export default function IncentiveProfileIndex({
                                             {profile.actions.can_edit && (
                                                 <Link
                                                     href={edit.url(profile.id)}
-                                                    className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                                                    className="rounded-md border gap-2 inline-flex border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
                                                 >
-                                                    Edit
+                                                    <SquarePen className="size-4" /> Edit
                                                 </Link>
                                             )}
                                             <Link
                                                 href={show.url(profile.id)}
-                                                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                                                className="rounded-md border gap-2 inline-flex border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
                                             >
-                                                View
+                                                <Eye className="size-4" /> View
                                             </Link>
                                         </div>
                                     </td>

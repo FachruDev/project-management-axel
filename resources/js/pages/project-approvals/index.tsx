@@ -1,4 +1,5 @@
 import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { Eye, CircleX, CircleCheck } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
 import {
@@ -90,7 +91,7 @@ export default function ProjectApprovalIndex({
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
-                            <tr>
+                            <tr className="text-center">
                                 <th className="px-4 py-3">Project</th>
                                 <th className="px-4 py-3">Status</th>
                                 <th className="px-4 py-3">Customer</th>
@@ -98,7 +99,7 @@ export default function ProjectApprovalIndex({
                                 <th className="px-4 py-3">Requested</th>
                                 <th className="px-4 py-3">Decision</th>
                                 <th className="px-4 py-3">Completeness</th>
-                                <th className="px-4 py-3 text-right">Action</th>
+                                <th className="px-4 py-3">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -172,27 +173,27 @@ export default function ProjectApprovalIndex({
                                         <div className="flex justify-end gap-2">
                                             <Link
                                                 href={preparationShow.url(project.id)}
-                                                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                                                className="rounded-md border gap-2 inline-flex border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
                                             >
-                                                Review
+                                                <Eye className="size-4" /> Review
                                             </Link>
                                             {project.status === 'pending_approval' && (
                                                 <>
                                                     <button
                                                         type="button"
                                                         onClick={() => openReject(project)}
-                                                        className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-pastel-red"
+                                                        className="rounded-md border gap-2 inline-flex border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-pastel-red"
                                                     >
-                                                        Reject
+                                                        <CircleX className="size-4" /> Reject
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={() =>
                                                             approveProject(project)
                                                         }
-                                                        className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90"
+                                                        className="rounded-md gap-2 inline-flex bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90"
                                                     >
-                                                        Approve
+                                                        <CircleCheck className="size-4" /> Approve
                                                     </button>
                                                 </>
                                             )}

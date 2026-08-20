@@ -186,7 +186,7 @@ export default function IncentiveIndex({
 function IncentiveRow({ item }: { item: IncentiveItem }) {
     return (
         <tr className="transition hover:bg-slate-50/80">
-            <td className="max-w-[180px] px-4 py-3">
+            <td className="max-w-45 px-4 py-3">
                 <div className="truncate font-medium text-slate-950" title={item.employee.name}>
                     {item.employee.name}
                 </div>
@@ -194,7 +194,7 @@ function IncentiveRow({ item }: { item: IncentiveItem }) {
                     {item.employee.email || '-'}
                 </div>
             </td>
-            <td className="max-w-[220px] px-4 py-3">
+            <td className="max-w-55 px-4 py-3">
                 <div className="truncate font-medium text-slate-950" title={item.project.name ?? ''}>
                     {item.project.id ? (
                         <Link href={projectShow.url(item.project.id)} className="hover:underline">

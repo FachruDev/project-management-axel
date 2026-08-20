@@ -1,4 +1,5 @@
 import { Link, router } from '@inertiajs/react';
+import { SquarePen, Printer } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import {
@@ -148,16 +149,16 @@ export default function ProjectQuotationIndex({
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                            <tr>
+                            <tr className="text-center">
                                 <th className="whitespace-nowrap px-4 py-3">Date</th>
                                 <th className="whitespace-nowrap px-4 py-3">Quotation No</th>
                                 <th className="whitespace-nowrap px-4 py-3">Project</th>
                                 <th className="whitespace-nowrap px-4 py-3">Customer</th>
                                 <th className="whitespace-nowrap px-4 py-3">Type</th>
                                 <th className="whitespace-nowrap px-4 py-3">Status</th>
-                                <th className="whitespace-nowrap px-4 py-3 text-right">Grand Total</th>
+                                <th className="whitespace-nowrap px-4 py-3">Grand Total</th>
                                 <th className="whitespace-nowrap px-4 py-3">Updated By</th>
-                                <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
+                                <th className="whitespace-nowrap px-4 py-3">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 bg-white">
@@ -193,10 +194,10 @@ function QuotationRow({ quotation }: { quotation: ProjectQuotationSummary }) {
                 <div className="font-semibold text-slate-900">{quotation.quotation_no}</div>
                 <div className="text-xs text-slate-400">{quotation.updated_at ?? '-'}</div>
             </td>
-            <td className="max-w-[200px] truncate px-4 py-3 text-slate-700" title={quotation.project?.name}>
+            <td className="max-w-50 truncate px-4 py-3 text-slate-700" title={quotation.project?.name}>
                 {quotation.project?.name ?? '-'}
             </td>
-            <td className="max-w-[180px] truncate px-4 py-3 text-slate-700" title={quotation.customer_name}>
+            <td className="max-w-45 truncate px-4 py-3 text-slate-700" title={quotation.customer_name}>
                 {quotation.customer_name}
             </td>
             <td className="whitespace-nowrap px-4 py-3 text-slate-600">
@@ -215,16 +216,16 @@ function QuotationRow({ quotation }: { quotation: ProjectQuotationSummary }) {
                 <div className="flex items-center justify-end gap-2">
                     <Link
                         href={edit.url(quotation.id)}
-                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                        className="rounded-md border gap-2 inline-flex border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
                     >
-                        Edit
+                        <SquarePen className="size-4" /> Edit
                     </Link>
                     <Link
                         href={printQuotation.url(quotation.id)}
                         target="_blank"
-                        className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-700"
+                        className="rounded-md gap-2 inline-flex border-primary bg-primary/90 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary"
                     >
-                        Print
+                        <Printer className="size-4" /> Print
                     </Link>
                 </div>
             </td>

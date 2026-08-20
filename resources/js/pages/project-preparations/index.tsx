@@ -1,12 +1,13 @@
 import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { Eye, SquarePen, Send } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
+import { create as importCreate } from '@/actions/App/Http/Controllers/ImportPreviewController';
 import {
     resubmit,
     show,
     store,
     submitApproval,
-    update,
 } from '@/actions/App/Http/Controllers/ProjectController';
 import { show as preparationShow } from '@/actions/App/Http/Controllers/ProjectPreparationController';
 import {
@@ -14,7 +15,6 @@ import {
     guide as projectPreparationGuide,
     template as projectPreparationTemplate,
 } from '@/actions/App/Http/Controllers/ProjectPreparationExcelController';
-import { create as importCreate } from '@/actions/App/Http/Controllers/ImportPreviewController';
 import preparationIndex from '@/actions/App/Http/Controllers/ProjectPreparationIndexController';
 import { ExcelTransferActions } from '@/components/excel-transfer-actions';
 import { Modal } from '@/components/modal';
@@ -25,7 +25,6 @@ import type {
     CustomerProjectOption,
     IncentiveProfileOption,
     ProjectPreparationIndexProps,
-    ProjectSummary,
 } from '@/types';
 
 type ProjectPayload = {
@@ -58,7 +57,6 @@ export default function ProjectPreparationIndex({
     const [status, setStatus] = useState(filters.status);
     const [customerId, setCustomerId] = useState(filters.customer_id);
     const [pmUserId, setPmUserId] = useState(filters.pm_user_id);
-    const [editing, setEditing] = useState<ProjectSummary | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
     const [customerSearch, setCustomerSearch] = useState('');
     const flash = usePage().props.flash as
@@ -85,43 +83,14 @@ export default function ProjectPreparationIndex({
     }
 
     function openCreate() {
-        setEditing(null);
         form.clearErrors();
         form.setData(blankProject);
         setCustomerSearch('');
         setModalOpen(true);
     }
 
-    function openEdit(project: ProjectSummary) {
-        const customerIds = project.customers.map((customer) =>
-            String(customer.id),
-        );
-
-        setEditing(project);
-        form.clearErrors();
-        form.setData({
-            name: project.name,
-            project_date: project.project_date,
-            customer_ids: customerIds,
-            primary_customer_id: customerIds[0] ?? '',
-            mandays: project.mandays,
-            incentive_profile_id: String(project.incentive_profile?.id ?? ''),
-        });
-        setCustomerSearch('');
-        setModalOpen(true);
-    }
-
     function submitForm(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-
-        if (editing) {
-            form.put(update.url(editing.id), {
-                preserveScroll: true,
-                onSuccess: () => setModalOpen(false),
-            });
-
-            return;
-        }
 
         form.post(store.url({ query: { redirect_to: 'preparation' } }), {
             preserveScroll: true,
@@ -246,14 +215,14 @@ export default function ProjectPreparationIndex({
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-pastel-slate text-left text-xs font-semibold uppercase text-slate-600">
-                            <tr>
+                            <tr className="text-center">
                                 <th className="px-4 py-3">Project</th>
                                 <th className="px-4 py-3">Customer</th>
                                 <th className="px-4 py-3">Status</th>
                                 <th className="px-4 py-3">PM</th>
                                 <th className="px-4 py-3">Incentive</th>
                                 <th className="px-4 py-3">Team</th>
-                                <th className="px-4 py-3 text-right">Actions</th>
+                                <th className="px-4 py-3">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -290,26 +259,18 @@ export default function ProjectPreparationIndex({
                                     </td>
                                     <td className="px-4 py-4">
                                         <div className="flex justify-end gap-2">
-                                            {project.actions.can_edit_basic && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => openEdit(project)}
-                                                    className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
-                                                >
-                                                    Edit
-                                                </button>
-                                            )}
+
                                             <Link
                                                 href={show.url(project.id)}
-                                                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                                                className="rounded-md border gap-2 inline-flex border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
                                             >
-                                                Detail
+                                                <Eye className="size-4" />Detail
                                             </Link>
                                             <Link
                                                 href={preparationShow.url(project.id)}
-                                                className="rounded-md border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-pastel-blue"
+                                                className="rounded-md border gap-2 inline-flex border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-pastel-blue"
                                             >
-                                                Prepare
+                                                <SquarePen className="size-4" />Prepare
                                             </Link>
                                             {project.actions.can_submit && (
                                                 <button
@@ -319,9 +280,9 @@ export default function ProjectPreparationIndex({
                                                             submitApproval.url(project.id),
                                                         )
                                                     }
-                                                    className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90"
+                                                    className="rounded-md gap-2 inline-flex bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90"
                                                 >
-                                                    Submit
+                                                    <Send className="size-4" />Submit
                                                 </button>
                                             )}
                                             {project.actions.can_resubmit && (
@@ -330,9 +291,9 @@ export default function ProjectPreparationIndex({
                                                     onClick={() =>
                                                         postAction(resubmit.url(project.id))
                                                     }
-                                                    className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90"
+                                                    className="rounded-md gap-2 inline-flex bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90"
                                                 >
-                                                    Resubmit
+                                                    <Send className="size-4" />Resubmit
                                                 </button>
                                             )}
                                         </div>
@@ -356,7 +317,7 @@ export default function ProjectPreparationIndex({
 
             <Modal
                 open={modalOpen}
-                title={editing ? 'Edit Draft' : 'New Draft Project'}
+                title="New Draft Project"
                 onClose={() => setModalOpen(false)}
             >
                 <form onSubmit={submitForm} className="flex flex-col gap-4">
@@ -442,14 +403,6 @@ export default function ProjectPreparationIndex({
                 </form>
             </Modal>
         </AppLayout>
-    );
-}
-
-function EmptyLane({ children }: { children: ReactNode }) {
-    return (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white/70 p-4 text-center text-sm text-slate-500">
-            {children}
-        </div>
     );
 }
 

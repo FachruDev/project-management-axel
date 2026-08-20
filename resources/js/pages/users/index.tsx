@@ -1,6 +1,8 @@
 import { router, useForm, usePage } from '@inertiajs/react';
+import { Trash2, SquarePen, CirclePlus } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { useState } from 'react';
+import { create as importCreate } from '@/actions/App/Http/Controllers/ImportPreviewController';
 import {
     destroy,
     index,
@@ -11,7 +13,6 @@ import {
     exportMethod as exportUsers,
     template as userTemplate,
 } from '@/actions/App/Http/Controllers/UserExcelController';
-import { create as importCreate } from '@/actions/App/Http/Controllers/ImportPreviewController';
 import { ExcelTransferActions } from '@/components/excel-transfer-actions';
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
@@ -168,9 +169,9 @@ export default function UserIndex({ users, filters, departments, roles }: Props)
                         <button
                             type="button"
                             onClick={openCreate}
-                            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+                            className="rounded-md gap-2 inline-flex bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
                         >
-                            New User
+                            <CirclePlus className="size-5" /> New User
                         </button>
                     </>
                 }
@@ -242,13 +243,13 @@ export default function UserIndex({ users, filters, departments, roles }: Props)
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
-                            <tr>
+                            <tr className="text-center">
                                 <th className="px-4 py-3">User</th>
                                 <th className="px-4 py-3">Department</th>
                                 <th className="px-4 py-3">Roles</th>
                                 <th className="px-4 py-3">Project Use</th>
                                 <th className="px-4 py-3">Status</th>
-                                <th className="px-4 py-3 text-right">Action</th>
+                                <th className="px-4 py-3">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -284,21 +285,21 @@ export default function UserIndex({ users, filters, departments, roles }: Props)
                                     <td className="px-4 py-3">
                                         <StatusBadge active={user.is_active} />
                                     </td>
-                                    <td className="px-4 py-3 text-right">
-                                        <div className="flex justify-end gap-2">
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="flex justify-center gap-2">
                                             <button
                                                 type="button"
                                                 onClick={() => openEdit(user)}
-                                                className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                                                className="rounded-md border gap-2 inline-flex   border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
                                             >
-                                                Edit
+                                                <SquarePen className="size-4" /> Edit
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => deleteUser(user)}
-                                                className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                                                className="rounded-md border gap-2 inline-flex border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
                                             >
-                                                Delete
+                                                <Trash2 className="size-4" /> Delete
                                             </button>
                                         </div>
                                     </td>
