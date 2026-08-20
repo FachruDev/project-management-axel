@@ -209,6 +209,14 @@ class Project extends Model
             ->latestOfMany('calculated_at');
     }
 
+    /**
+     * @return HasMany<ProjectQuotation, $this>
+     */
+    public function quotations(): HasMany
+    {
+        return $this->hasMany(ProjectQuotation::class);
+    }
+
     public function hasAttachment(AttachmentCollection $collection): bool
     {
         return $this->attachments()

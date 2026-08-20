@@ -2,6 +2,7 @@ import {
     LayoutDashboard,
     FolderKanban,
     FileSpreadsheet,
+    FileText,
     Calculator,
     CheckCircle2,
     CheckSquare,
@@ -26,6 +27,7 @@ import { index as projectApprovalsIndex } from '@/actions/App/Http/Controllers/P
 import { index as projectCalculationsIndex } from '@/actions/App/Http/Controllers/ProjectCalculationController';
 import { index as projectsIndex } from '@/actions/App/Http/Controllers/ProjectController';
 import projectPreparationsIndex from '@/actions/App/Http/Controllers/ProjectPreparationIndexController';
+import { index as projectQuotationsIndex } from '@/actions/App/Http/Controllers/ProjectQuotationController';
 import { index as rolesIndex } from '@/actions/App/Http/Controllers/RoleController';
 import tasksIndex from '@/actions/App/Http/Controllers/TaskBoardController';
 import { index as usersIndex } from '@/actions/App/Http/Controllers/UserController';
@@ -80,6 +82,14 @@ export const sidebarItems: SidebarItem[] = [
         icon: Calculator,
         href: projectCalculationsIndex.url(),
         permission: 'view_project_incentives',
+        status: 'ready',
+    },
+    {
+        label: 'Project Quotations',
+        section: 'Project',
+        icon: FileText,
+        href: projectQuotationsIndex.url(),
+        permission: 'manage_project_quotations',
         status: 'ready',
     },
     {

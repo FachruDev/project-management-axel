@@ -31,6 +31,7 @@ class RoleSeeder extends Seeder
             'manage_projects',
             'view_projects',
             'approve_projects',
+            'manage_project_quotations',
             'manage_tasks',
             'view_tasks',
             'manage_customers',

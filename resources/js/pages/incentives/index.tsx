@@ -9,8 +9,9 @@ import { Pagination } from '@/components/pagination';
 import { AppLayout } from '@/layouts/app-layout';
 import type { AdminIncentiveIndexProps, IncentiveItem } from '@/types';
 
+// Class reusable untuk input dan select agar seragam dan responsif
 const inputClass =
-    'rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-700';
+    'w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-700 focus:ring-1 focus:ring-slate-700';
 
 export default function IncentiveIndex({
     items,
@@ -54,74 +55,115 @@ export default function IncentiveIndex({
                 description="Readonly employee incentives from locked current project calculations."
             />
 
-            <section className="grid gap-4 md:grid-cols-4">
+            {/* Kartu Ringkasan (Metrics): 1 kolom di HP, 2 di tablet, 4 di desktop */}
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Metric label="Total Final Score" value={formatScore(summary.total_incentive)} />
                 <Metric label="Employees" value={String(summary.employees_count)} />
                 <Metric label="Projects" value={String(summary.projects_count)} />
                 <Metric label="Items" value={String(summary.items_count)} />
             </section>
 
+            {/* Form Filter Responsif: 1 -> 2 -> 4 -> 8 kolom */}
             <form
                 onSubmit={submitFilters}
-                className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 xl:grid-cols-[1fr_180px_180px_180px_180px_150px_150px_auto]"
+                className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8"
             >
-                <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search employee, project, customer"
-                    className={inputClass}
-                />
-                <Select value={employeeId} onChange={setEmployeeId} label="All Employees" options={options.employees} />
-                <Select value={projectId} onChange={setProjectId} label="All Projects" options={options.projects} />
-                <Select value={customerId} onChange={setCustomerId} label="All Customers" options={options.customers} />
-                <select
-                    value={profileId}
-                    onChange={(event) => setProfileId(event.target.value)}
-                    className={inputClass}
-                >
-                    <option value="">All Profiles</option>
-                    {options.incentive_profiles.map((profile) => (
-                        <option key={profile.id} value={profile.id}>
-                            {profile.code} v{profile.version}
-                        </option>
-                    ))}
-                </select>
-                <input
-                    type="date"
-                    value={lockedFrom}
-                    onChange={(event) => setLockedFrom(event.target.value)}
-                    className={inputClass}
-                    aria-label="Locked from"
-                />
-                <input
-                    type="date"
-                    value={lockedTo}
-                    onChange={(event) => setLockedTo(event.target.value)}
-                    className={inputClass}
-                    aria-label="Locked to"
-                />
-                <button
-                    type="submit"
-                    className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
-                >
-                    Apply
-                </button>
+                <div className="sm:col-span-2 lg:col-span-2 2xl:col-span-1">
+                    <input
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Search employee, project, customer"
+                        className={inputClass}
+                    />
+                </div>
+
+                <div>
+                    <Select
+                        value={employeeId}
+                        onChange={setEmployeeId}
+                        label="All Employees"
+                        options={options.employees}
+                    />
+                </div>
+
+                <div>
+                    <Select
+                        value={projectId}
+                        onChange={setProjectId}
+                        label="All Projects"
+                        options={options.projects}
+                    />
+                </div>
+
+                <div>
+                    <Select
+                        value={customerId}
+                        onChange={setCustomerId}
+                        label="All Customers"
+                        options={options.customers}
+                    />
+                </div>
+
+                <div>
+                    <select
+                        value={profileId}
+                        onChange={(event) => setProfileId(event.target.value)}
+                        className={inputClass}
+                    >
+                        <option value="">All Profiles</option>
+                        {options.incentive_profiles.map((profile) => (
+                            <option key={profile.id} value={profile.id}>
+                                {profile.code} v{profile.version}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <input
+                        type="date"
+                        value={lockedFrom}
+                        onChange={(event) => setLockedFrom(event.target.value)}
+                        className={inputClass}
+                        aria-label="Locked from"
+                    />
+                </div>
+
+                <div>
+                    <input
+                        type="date"
+                        value={lockedTo}
+                        onChange={(event) => setLockedTo(event.target.value)}
+                        className={inputClass}
+                        aria-label="Locked to"
+                    />
+                </div>
+
+                <div className="sm:col-span-2 lg:col-span-4 2xl:col-span-1">
+                    <button
+                        type="submit"
+                        className="w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    >
+                        Apply
+                    </button>
+                </div>
             </form>
 
-            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            {/* Bagian Tabel Data */}
+            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200 text-sm">
-                        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+                        <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                             <tr>
-                                <th className="px-4 py-3">Employee</th>
-                                <th className="px-4 py-3">Project</th>
-                                <th className="px-4 py-3">Role</th>
-                                <th className="px-4 py-3">Profile</th>
-                                <th className="px-4 py-3">Locked At</th>
-                                <th className="px-4 py-3 text-right">Final Score</th>
+                                <th className="whitespace-nowrap px-4 py-3">Employee</th>
+                                <th className="whitespace-nowrap px-4 py-3">Project</th>
+                                <th className="whitespace-nowrap px-4 py-3">Role</th>
+                                <th className="whitespace-nowrap px-4 py-3">Profile</th>
+                                <th className="whitespace-nowrap px-4 py-3">Locked At</th>
+                                <th className="whitespace-nowrap px-4 py-3 text-right">Final Score</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-slate-100 bg-white">
                             {items.data.map((item) => (
                                 <IncentiveRow key={item.id} item={item} />
                             ))}
@@ -143,51 +185,55 @@ export default function IncentiveIndex({
 
 function IncentiveRow({ item }: { item: IncentiveItem }) {
     return (
-        <tr className="hover:bg-slate-50">
-            <td className="px-4 py-3">
-                <div className="font-medium text-slate-950">{item.employee.name}</div>
-                <div className="text-xs text-slate-500">{item.employee.email || '-'}</div>
+        <tr className="transition hover:bg-slate-50/80">
+            <td className="max-w-[180px] px-4 py-3">
+                <div className="truncate font-medium text-slate-950" title={item.employee.name}>
+                    {item.employee.name}
+                </div>
+                <div className="truncate text-xs text-slate-500" title={item.employee.email || ''}>
+                    {item.employee.email || '-'}
+                </div>
             </td>
-            <td className="px-4 py-3">
-                <div className="font-medium text-slate-950">
+            <td className="max-w-[220px] px-4 py-3">
+                <div className="truncate font-medium text-slate-950" title={item.project.name}>
                     {item.project.id ? (
-                        <Link href={projectShow.url(item.project.id)} className="hover:text-primary">
+                        <Link href={projectShow.url(item.project.id)} className="hover:underline">
                             {item.project.name}
                         </Link>
                     ) : (
                         item.project.name ?? '-'
                     )}
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="truncate text-xs text-slate-500" title={item.project.customers.map((c) => c.name).join(', ')}>
                     {item.project.customers.map((customer) => customer.name).join(', ') || '-'}
                 </div>
             </td>
-            <td className="px-4 py-3 text-slate-600">
+            <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                 <div>{item.project_role}</div>
                 <div className="text-xs text-slate-500">
                     {item.pic_level ?? '-'} {item.is_support ? '/ Support' : ''}
                 </div>
             </td>
-            <td className="px-4 py-3 text-slate-600">
+            <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                 {item.incentive_profile
                     ? `${item.incentive_profile.code} v${item.incentive_profile.version}`
                     : '-'}
                 <div className="text-xs text-slate-500">{item.calculation.delivery_status || '-'}</div>
             </td>
-            <td className="px-4 py-3 text-slate-600">
-                {item.calculation.locked_at ?? '-'}
+            <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                <div>{item.calculation.locked_at ?? '-'}</div>
                 {item.calculation.id && (
                     <div>
                         <Link
                             href={calculationShow.url(item.calculation.id)}
-                            className="text-xs font-medium text-primary hover:underline"
+                            className="text-xs font-medium text-slate-800 hover:underline"
                         >
                             Calculation #{item.calculation.id}
                         </Link>
                     </div>
                 )}
             </td>
-            <td className="px-4 py-3 text-right font-semibold text-slate-950">
+            <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">
                 {formatScore(item.final_incentive)}
                 <div className="text-xs font-normal text-slate-500">
                     Base {formatScore(item.base_incentive)} x {formatScore(item.delivery_multiplier)}
@@ -222,9 +268,9 @@ function Select({
 
 function Metric({ label, value }: { label: string; value: string }) {
     return (
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-xs font-medium uppercase text-slate-500">{label}</div>
-            <div className="mt-2 text-lg font-semibold text-slate-950">{value}</div>
+            <div className="mt-2 text-2xl font-semibold text-slate-950">{value}</div>
         </div>
     );
 }

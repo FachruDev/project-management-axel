@@ -32,6 +32,7 @@ class PermissionSeeder extends Seeder
                 'manage_projects',
                 'view_projects',
                 'approve_projects',
+                'manage_project_quotations',
                 'override_actual_dates',
                 'export_project_preparations',
                 'import_project_preparations',

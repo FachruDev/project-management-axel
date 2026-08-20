@@ -22,6 +22,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectPreparationController;
 use App\Http\Controllers\ProjectPreparationExcelController;
 use App\Http\Controllers\ProjectPreparationIndexController;
+use App\Http\Controllers\ProjectQuotationController;
 use App\Http\Controllers\ProjectStatusMoveController;
 use App\Http\Controllers\ProjectTaskBulkDeleteController;
 use App\Http\Controllers\ProjectTaskController;
@@ -170,6 +171,13 @@ Route::middleware('portal.auth')->group(function (): void {
     Route::get('project-preparations', ProjectPreparationIndexController::class)
         ->middleware('can:manage_projects')
         ->name('project-preparations.index');
+
+    Route::get('project-quotations/{project_quotation}/print', [ProjectQuotationController::class, 'print'])
+        ->middleware('can:manage_project_quotations')
+        ->name('project-quotations.print');
+    Route::resource('project-quotations', ProjectQuotationController::class)
+        ->only(['index', 'create', 'store', 'edit', 'update'])
+        ->middleware('can:manage_project_quotations');
 
     Route::get('tasks', TaskBoardController::class)
         ->middleware('can:view_tasks')

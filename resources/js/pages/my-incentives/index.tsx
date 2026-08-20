@@ -9,8 +9,9 @@ import { Pagination } from '@/components/pagination';
 import { AppLayout } from '@/layouts/app-layout';
 import type { IncentiveItem, MyIncentiveIndexProps } from '@/types';
 
+// Class standar input dengan w-full agar mengisi grid secara proporsional
 const inputClass =
-    'rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-700';
+    'w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-700 focus:ring-1 focus:ring-slate-700';
 
 export default function MyIncentiveIndex({
     items,
@@ -52,60 +53,97 @@ export default function MyIncentiveIndex({
                 description="Readonly incentive from locked current project calculations."
             />
 
-            <section className="grid gap-4 md:grid-cols-3">
+            {/* Metric Card Section: 1 kolom di HP, 3 kolom di layar tablet ke atas */}
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <Metric label="Total Final Score" value={formatScore(summary.total_incentive)} />
                 <Metric label="Projects" value={String(summary.projects_count)} />
                 <Metric label="Items" value={String(summary.items_count)} />
             </section>
 
+            {/* Filter Form: Grid responsif bertahap (1 col -> 2 col -> 3 col -> 7 col) */}
             <form
                 onSubmit={submitFilters}
-                className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 lg:grid-cols-[1fr_180px_180px_180px_150px_150px_auto]"
+                className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7"
             >
-                <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search project, customer, role"
-                    className={inputClass}
-                />
-                <Select value={projectId} onChange={setProjectId} label="All Projects" options={options.projects} />
-                <Select value={customerId} onChange={setCustomerId} label="All Customers" options={options.customers} />
-                <select
-                    value={profileId}
-                    onChange={(event) => setProfileId(event.target.value)}
-                    className={inputClass}
-                >
-                    <option value="">All Profiles</option>
-                    {options.incentive_profiles.map((profile) => (
-                        <option key={profile.id} value={profile.id}>
-                            {profile.code} v{profile.version}
-                        </option>
-                    ))}
-                </select>
-                <input
-                    type="date"
-                    value={lockedFrom}
-                    onChange={(event) => setLockedFrom(event.target.value)}
-                    className={inputClass}
-                    aria-label="Locked from"
-                />
-                <input
-                    type="date"
-                    value={lockedTo}
-                    onChange={(event) => setLockedTo(event.target.value)}
-                    className={inputClass}
-                    aria-label="Locked to"
-                />
-                <button
-                    type="submit"
-                    className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-50"
-                >
-                    Apply
-                </button>
+                {/* Search input membentang 2 kolom pada tablet dan desktop sedang */}
+                <div className="sm:col-span-2 lg:col-span-3 xl:col-span-1">
+                    <input
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Search project, customer, role"
+                        className={inputClass}
+                    />
+                </div>
+
+                <div>
+                    <Select
+                        value={projectId}
+                        onChange={setProjectId}
+                        label="All Projects"
+                        options={options.projects}
+                    />
+                </div>
+
+                <div>
+                    <Select
+                        value={customerId}
+                        onChange={setCustomerId}
+                        label="All Customers"
+                        options={options.customers}
+                    />
+                </div>
+
+                <div>
+                    <select
+                        value={profileId}
+                        onChange={(event) => setProfileId(event.target.value)}
+                        className={inputClass}
+                    >
+                        <option value="">All Profiles</option>
+                        {options.incentive_profiles.map((profile) => (
+                            <option key={profile.id} value={profile.id}>
+                                {profile.code} v{profile.version}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <input
+                        type="date"
+                        value={lockedFrom}
+                        onChange={(event) => setLockedFrom(event.target.value)}
+                        className={inputClass}
+                        aria-label="Locked from"
+                    />
+                </div>
+
+                <div>
+                    <input
+                        type="date"
+                        value={lockedTo}
+                        onChange={(event) => setLockedTo(event.target.value)}
+                        className={inputClass}
+                        aria-label="Locked to"
+                    />
+                </div>
+
+                {/* Tombol Apply membentang penuh di mobile/tablet, atau pas di desktop lebar */}
+                <div className="sm:col-span-2 lg:col-span-3 xl:col-span-1">
+                    <button
+                        type="submit"
+                        className="w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                    >
+                        Apply
+                    </button>
+                </div>
             </form>
 
-            <IncentiveTable items={items.data} showEmployee={false} />
-            <Pagination data={items} />
+            {/* Container Tabel dengan Pagination */}
+            <div className="space-y-4">
+                <IncentiveTable items={items.data} showEmployee={false} />
+                <Pagination data={items} />
+            </div>
         </AppLayout>
     );
 }
@@ -118,49 +156,49 @@ function IncentiveTable({
     showEmployee: boolean;
 }) {
     return (
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
+                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                         <tr>
-                            {showEmployee && <th className="px-4 py-3">Employee</th>}
-                            <th className="px-4 py-3">Project</th>
-                            <th className="px-4 py-3">Role</th>
-                            <th className="px-4 py-3">Profile</th>
-                            <th className="px-4 py-3">Locked At</th>
-                            <th className="px-4 py-3 text-right">Final Score</th>
+                            {showEmployee && <th className="whitespace-nowrap px-4 py-3">Employee</th>}
+                            <th className="whitespace-nowrap px-4 py-3">Project</th>
+                            <th className="whitespace-nowrap px-4 py-3">Role</th>
+                            <th className="whitespace-nowrap px-4 py-3">Profile</th>
+                            <th className="whitespace-nowrap px-4 py-3">Locked At</th>
+                            <th className="whitespace-nowrap px-4 py-3 text-right">Final Score</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-100 bg-white">
                         {items.map((item) => (
-                            <tr key={item.id} className="hover:bg-slate-50">
+                            <tr key={item.id} className="transition hover:bg-slate-50/80">
                                 {showEmployee && (
-                                    <td className="px-4 py-3">
+                                    <td className="whitespace-nowrap px-4 py-3">
                                         <div className="font-medium text-slate-950">{item.employee.name}</div>
                                         <div className="text-xs text-slate-500">{item.employee.email || '-'}</div>
                                     </td>
                                 )}
-                                <td className="px-4 py-3">
-                                    <div className="font-medium text-slate-950">
+                                <td className="max-w-[220px] px-4 py-3">
+                                    <div className="truncate font-medium text-slate-950" title={item.project.name}>
                                         {item.project.id ? (
-                                            <Link href={projectShow.url(item.project.id)} className="hover:text-primary">
+                                            <Link href={projectShow.url(item.project.id)} className="hover:underline">
                                                 {item.project.name}
                                             </Link>
                                         ) : (
                                             item.project.name ?? '-'
                                         )}
                                     </div>
-                                    <div className="text-xs text-slate-500">
+                                    <div className="truncate text-xs text-slate-500" title={item.project.customers.map((c) => c.name).join(', ')}>
                                         {item.project.customers.map((customer) => customer.name).join(', ') || '-'}
                                     </div>
                                 </td>
-                                <td className="px-4 py-3 text-slate-600">
+                                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                                     <div>{item.project_role}</div>
                                     <div className="text-xs text-slate-500">
                                         {item.pic_level ?? '-'} {item.is_support ? '/ Support' : ''}
                                     </div>
                                 </td>
-                                <td className="px-4 py-3 text-slate-600">
+                                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                                     {item.incentive_profile
                                         ? `${item.incentive_profile.code} v${item.incentive_profile.version}`
                                         : '-'}
@@ -168,20 +206,20 @@ function IncentiveTable({
                                         {item.calculation.delivery_status || '-'}
                                     </div>
                                 </td>
-                                <td className="px-4 py-3 text-slate-600">
-                                    {item.calculation.locked_at ?? '-'}
+                                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                                    <div>{item.calculation.locked_at ?? '-'}</div>
                                     {item.calculation.id && (
                                         <div>
                                             <Link
                                                 href={calculationShow.url(item.calculation.id)}
-                                                className="text-xs font-medium text-primary hover:underline"
+                                                className="text-xs font-medium text-slate-800 hover:underline"
                                             >
                                                 Calculation #{item.calculation.id}
                                             </Link>
                                         </div>
                                     )}
                                 </td>
-                                <td className="px-4 py-3 text-right font-semibold text-slate-950">
+                                <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-950">
                                     {formatScore(item.final_incentive)}
                                     <div className="text-xs font-normal text-slate-500">
                                         Base {formatScore(item.base_incentive)} x {formatScore(item.delivery_multiplier)}
@@ -231,9 +269,9 @@ function Select({
 
 function Metric({ label, value }: { label: string; value: string }) {
     return (
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-xs font-medium uppercase text-slate-500">{label}</div>
-            <div className="mt-2 text-lg font-semibold text-slate-950">{value}</div>
+            <div className="mt-2 text-2xl font-semibold text-slate-950">{value}</div>
         </div>
     );
 }
