@@ -43,7 +43,7 @@ class StoreProjectQuotationRequest extends FormRequest
             'status' => ['required', Rule::enum(ProjectQuotationStatus::class)],
             'items' => ['required', 'array', 'min:1'],
             'items.*.unit' => ['required', 'string', 'max:50'],
-            'items.*.description' => ['required', 'string'],
+            'items.*.description' => ['required', 'string', 'max:255'],
             'items.*.qty' => ['nullable', 'numeric', 'min:0'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.discount' => ['nullable', 'numeric', 'min:0', 'max:100'],

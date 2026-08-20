@@ -88,6 +88,28 @@ class ProjectQuotationWorkflowTest extends TestCase
             ->assertSessionHasErrors('project_id');
     }
 
+    public function test_item_description_is_limited_to_255_characters(): void
+    {
+        $user = $this->userWithPermissions(['manage_project_quotations']);
+        $project = $this->approvedProject(['pm_user_id' => $user->id]);
+
+        $this
+            ->actingAs($user)
+            ->post(route('project-quotations.store'), $this->payload($project, [
+                'items' => [
+                    [
+                        'unit' => 'mandays',
+                        'description' => str('A')->repeat(256)->toString(),
+                        'qty' => '1',
+                        'unit_price' => '1000000',
+                        'discount' => '0',
+                        'amount' => '',
+                    ],
+                ],
+            ]))
+            ->assertSessionHasErrors('items.0.description');
+    }
+
     public function test_support_cannot_access_quotation_for_project_outside_visibility(): void
     {
         $user = $this->userWithPermissions(['manage_project_quotations']);

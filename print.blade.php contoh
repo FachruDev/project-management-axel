@@ -1,0 +1,527 @@
+@php
+    $typeLabel = $type_labels[$quotation->quotation_type] ?? $quotation->quotation_type;
+    $quotationDate = $quotation->quotation_date ? $quotation->quotation_date->format('d-M-Y') : '-';
+    $termDate = $quotation->term_of_payment_date ? $quotation->term_of_payment_date->format('d-M-Y') : '-';
+    $validUntilDate = $quotation->valid_until_date ? $quotation->valid_until_date->format('d-M-Y') : '-';
+    $signatureName = trim((string) ($quotation->approved_by_name ?: $quotation->prepared_by_name ?: ''));
+    $customerAddress = trim((string) ($quotation->customer_address ?: $quotation->customer_identifier ?: ''));
+    $companyName = 'PT AXELERA TEKNO SOLUSI';
+    $items = $quotation->items;
+    $minRows = 12;
+    $padRows = max($minRows - $items->count(), 0);
+    $description = trim((string) ($quotation->description ?: $typeLabel));
+    $logoRelativePath = 'assets/images/axel.png';
+    $logoAbsolutePath = public_path($logoRelativePath);
+    $logoUrl = file_exists($logoAbsolutePath) ? asset($logoRelativePath) : null;
+    $currency = static function ($value) {
+        return number_format((float) $value, 0, '.', ',');
+    };
+@endphp
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ $quotation->quotation_no }}</title>
+    <style>
+        :root {
+            --blue: #4e78c6;
+            --line: #232323;
+            --light-bg: #efefef;
+            --muted-bg: #8f8f8f;
+            --grand-bg: #d9e3f4;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: #111;
+            background: #e3e6ea;
+            font-size: 11px;
+            line-height: 1.35;
+        }
+
+        .print-toolbar {
+            width: 210mm;
+            margin: 10px auto 6px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .print-toolbar button {
+            border: 1px solid #9ca3af;
+            background: #fff;
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .sheet {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto 16px;
+            padding: 8mm 7mm 10mm;
+            background: var(--light-bg);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .top-grid {
+            display: grid;
+            grid-template-columns: 1.18fr 0.82fr;
+            gap: 6mm;
+            align-items: start;
+        }
+
+        .brand-title {
+            margin: 0;
+            font-size: 28px;
+            letter-spacing: 1px;
+            line-height: 1;
+            font-weight: 700;
+        }
+
+        .brand-logo {
+            max-width: 85px;
+            height: auto;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .company-info {
+            margin-top: 8px;
+            font-size: 9px;
+            line-height: 1.45;
+        }
+
+        .customer-box {
+            margin-top: 10px;
+        }
+
+        .customer-box .head {
+            background: var(--blue);
+            color: #fff;
+            font-size: 10px;
+            padding: 4px 7px;
+        }
+
+        .customer-box .body {
+            min-height: 52px;
+            padding: 6px 7px;
+            font-size: 9px;
+        }
+
+        .quotation-head {
+            text-align: right;
+            max-width: 100%;
+            overflow-wrap: anywhere;
+        }
+
+        .quotation-head h1 {
+            margin: 0;
+            font-size: 21px;
+            letter-spacing: 1px;
+            color: #243b66;
+            font-weight: 500;
+            line-height: 1.1;
+        }
+
+        .quotation-head .company {
+            margin-top: 2px;
+            font-size: 8.6px;
+            letter-spacing: 0.2px;
+            color: #243b66;
+            font-weight: 600;
+            line-height: 1.2;
+            white-space: normal;
+            word-break: break-word;
+        }
+
+        .meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 9px;
+        }
+
+        .meta-table td {
+            padding: 1px 0;
+            vertical-align: top;
+        }
+
+        .meta-table td:first-child {
+            width: 100px;
+            font-weight: 700;
+        }
+
+        .meta-table .meta-value {
+            white-space: pre-line;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            margin-top: 12px;
+            font-size: 9px;
+        }
+
+        .items-table th {
+            border: 1px solid #2f5698;
+            background: var(--blue);
+            color: #fff;
+            text-align: center;
+            font-size: 10px;
+            font-weight: 500;
+            padding: 4px 3px;
+        }
+
+        .items-table td {
+            border: 1px solid var(--line);
+            padding: 3px 4px;
+            vertical-align: top;
+            word-break: break-word;
+        }
+
+        .items-table td.center {
+            text-align: center;
+        }
+
+        .items-table td.right {
+            text-align: right;
+        }
+
+        .item-empty-row td {
+            height: 17px;
+        }
+
+        .item-empty-row .dash {
+            color: #111;
+            text-align: right;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 56% 44%;
+            margin-top: -1px;
+        }
+
+        .payment-wrap {
+            border: 1px solid var(--line);
+            border-right: none;
+        }
+
+        .payment-head {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .payment-head div {
+            background: var(--blue);
+            border-right: 1px solid var(--line);
+            color: #fff;
+            padding: 4px 6px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .payment-head div:last-child {
+            border-right: none;
+        }
+
+        .payment-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: 44px;
+        }
+
+        .payment-body div {
+            border-top: 1px solid var(--line);
+            border-right: 1px solid var(--line);
+            padding: 8px 6px;
+            font-size: 10px;
+        }
+
+        .payment-body div:last-child {
+            border-right: none;
+        }
+
+        .total-wrap {
+            border: 1px solid var(--line);
+        }
+
+        .total-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 10px;
+        }
+
+        .total-table td {
+            border-bottom: 1px solid var(--line);
+            padding: 3px 6px;
+        }
+
+        .total-table td:first-child {
+            width: 56%;
+        }
+
+        .total-table td:last-child {
+            border-left: 1px solid var(--line);
+            text-align: right;
+        }
+
+        .total-table tr:last-child td {
+            font-weight: 700;
+            border-bottom: 2px solid var(--line);
+            font-size: 12px;
+        }
+
+        .total-table tr:last-child td:last-child {
+            background: var(--grand-bg);
+        }
+
+        .note-line {
+            margin-top: 6px;
+            width: 56%;
+            border: 1px solid #b8b8b8;
+            padding: 4px 8px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .creator-bar {
+            margin-top: 8px;
+            background: var(--muted-bg);
+            color: #fff;
+            font-size: 10px;
+            padding: 3px 8px;
+            border: 1px solid #7f7f7f;
+        }
+
+        .footer-grid {
+            margin-top: 8px;
+            display: grid;
+            grid-template-columns: 65% 35%;
+            min-height: 92px;
+        }
+
+        .signature {
+            padding-top: 56px;
+        }
+
+        .signature-line {
+            width: 74mm;
+            border-top: 1px solid #111;
+        }
+
+        .signature-name {
+            width: 74mm;
+            text-align: center;
+            margin-top: 4px;
+            font-size: 10px;
+        }
+
+        .signature-company {
+            width: 74mm;
+            text-align: center;
+            font-size: 9px;
+        }
+
+        .qr-block {
+            text-align: center;
+            align-self: end;
+        }
+
+        .qr-block img {
+            width: 30mm;
+            height: 30mm;
+            object-fit: contain;
+        }
+
+        .qr-block .url {
+            font-size: 9px;
+            margin-top: 2px;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 0;
+        }
+
+        @media print {
+            body {
+                background: #fff;
+            }
+
+            .print-toolbar {
+                display: none;
+            }
+
+            .sheet {
+                margin: 0;
+                box-shadow: none;
+                width: 210mm;
+                min-height: 297mm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-toolbar">
+        <button onclick="window.print()">Print</button>
+    </div>
+
+    <div class="sheet">
+        <div class="top-grid">
+            <div>
+                @if ($logoUrl)
+                    <img src="{{ $logoUrl }}" alt="AXEL" class="brand-logo">
+                @else
+                    <h2 class="brand-title">AXEL</h2>
+                @endif
+                <div class="company-info">
+                    <div>JL. Andara,</div>
+                    <div>Kelurahan Pangkalan Jati Baru,</div>
+                    <div>Kec. Cinere, Kota Depok, Jawa Barat, 16542</div>
+                    <div>Telp : 021-0000-0000</div>
+                    <div>Website: www.axeltekno.com</div>
+                </div>
+
+                <div class="customer-box">
+                    <div class="head">Customer</div>
+                        <div class="body">
+                            <div><strong>{{ $quotation->customer_name ?: '-' }}</strong></div>
+                            <div>{!! nl2br(e($customerAddress ?: '-')) !!}</div>
+                            <div>cc : {!! nl2br(e((string) ($quotation->cc ?: '-'))) !!}</div>
+                        </div>
+                    </div>
+                </div>
+
+            <div>
+                <div class="quotation-head">
+                    <h1>QUOTATION</h1>
+                    <div class="company">{{ $companyName }}</div>
+                </div>
+                <table class="meta-table">
+                    <tr>
+                        <td>Tanggal</td>
+                        <td>{{ $quotationDate }}</td>
+                    </tr>
+                    <tr>
+                        <td>Nomor Quotation</td>
+                        <td>{{ $quotation->quotation_no }}</td>
+                    </tr>
+                    <tr>
+                        <td>Alamat Customer</td>
+                        <td>{!! nl2br(e($customerAddress ?: '-')) !!}</td>
+                    </tr>
+                    <tr>
+                        <td>Keterangan</td>
+                        <td class="meta-value">{{ $description }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <table class="items-table">
+            <colgroup>
+                <col style="width: 4%;">
+                <col style="width: 10%;">
+                <col style="width: 9%;">
+                <col style="width: 36.5%;">
+                <col style="width: 8%;">
+                <col style="width: 11.5%;">
+                <col style="width: 6%;">
+                <col style="width: 15%;">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Kategori</th>
+                    <th>Satuan Unit</th>
+                    <th>Deskripsi</th>
+                    <th>QTY</th>
+                    <th>Harga per Unit</th>
+                    <th>Disc</th>
+                    <th>JUMLAH (Rp)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($items as $index => $item)
+                    <tr>
+                        <td class="center">{{ $index + 1 }}</td>
+                        <td>{{ ucfirst((string) $item->category) }}</td>
+                        <td>{{ ucfirst((string) $item->unit) }}</td>
+                        <td>{!! nl2br(e((string) $item->description)) !!}</td>
+                        <td class="right">{{ $item->qty !== null ? rtrim(rtrim(number_format((float) $item->qty, 2, '.', ''), '0'), '.') : '-' }}</td>
+                        <td class="right">{{ $item->unit_price !== null ? $currency($item->unit_price) : '-' }}</td>
+                        <td class="right">{{ $item->discount_percent !== null ? rtrim(rtrim(number_format((float) $item->discount_percent, 2, '.', ''), '0'), '.') . '%' : '-' }}</td>
+                        <td class="right">{{ $currency($item->amount) }}</td>
+                    </tr>
+                @endforeach
+
+                @for ($i = 0; $i < $padRows; $i++)
+                    <tr class="item-empty-row">
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td class="dash">-</td>
+                    </tr>
+                @endfor
+            </tbody>
+        </table>
+
+        <div class="summary-grid">
+            <div class="payment-wrap">
+                <div class="payment-head">
+                    <div>Term of Payment</div>
+                    <div>Quotation Valid until :</div>
+                </div>
+                <div class="payment-body">
+                    <div>{{ $termDate }}</div>
+                    <div>{{ $validUntilDate }}</div>
+                </div>
+            </div>
+            <div class="total-wrap">
+                <table class="total-table">
+                    <tr>
+                        <td>Sub Total</td>
+                        <td>{{ $currency($quotation->subtotal) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Ppn / pph</td>
+                        <td>{{ number_format((float) $quotation->ppn_pph_percent, 2) }}%</td>
+                    </tr>
+                    <tr>
+                        <td>TOTAL</td>
+                        <td>Rp{{ $currency($quotation->grand_total) }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="note-line">Note : {{ $quotation->note ?: '-' }}</div>
+        <div class="creator-bar">Pembuat :</div>
+
+        <div class="footer-grid">
+            <div class="signature">
+                <div class="signature-line"></div>
+                <div class="signature-name">{{ $signatureName !== '' ? $signatureName : '............................' }}</div>
+                <div class="signature-company">{{ $companyName }}</div>
+            </div>
+            <div class="qr-block">
+                <img src="{{ $qr_image_url }}" alt="QR">
+                <div class="url">{{ $qr_target_url }}</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

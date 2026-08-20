@@ -179,7 +179,7 @@ function IncentiveTable({
                                     </td>
                                 )}
                                 <td className="max-w-[220px] px-4 py-3">
-                                    <div className="truncate font-medium text-slate-950" title={item.project.name}>
+                                    <div className="truncate font-medium text-slate-950" title={item.project.name ?? ''}>
                                         {item.project.id ? (
                                             <Link href={projectShow.url(item.project.id)} className="hover:underline">
                                                 {item.project.name}
