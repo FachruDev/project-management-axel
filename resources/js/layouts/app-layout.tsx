@@ -14,7 +14,7 @@ export function AppLayout({ title, children }: Props) {
     return (
         <>
             <Head title={title} />
-            <div className="min-h-screen bg-slate-50/80 text-slate-900 font-sans antialiased flex flex-col">
+            <div className="min-h-screen bg-slate-50/80 font-sans text-slate-900 antialiased flex flex-col">
 
                 {/* Mobile Backdrop Overlay */}
                 {sidebarOpen && (
@@ -26,33 +26,31 @@ export function AppLayout({ title, children }: Props) {
 
                 <div className="flex flex-1 relative items-start">
 
-                    {/* Fixed Sidebar Component */}
+                    {/* Fixed/Collapsible Sidebar Component */}
                     <AppSidebar
                         open={sidebarOpen}
                         onCollapse={() => setSidebarOpen(false)}
                     />
 
-                    {/* Main Content Area */}
-                    <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+                    {/* Main Content Area: Full Height tanpa Topbar */}
+                    <div className="flex-1 min-w-0 flex flex-col min-h-screen relative">
 
-                        {/* Top Floating Toggle Header (visible when sidebar collapsed) */}
+                        {/* Floating Toggle Button (Melayang hanya saat sidebar tertutup) */}
                         {!sidebarOpen && (
-                            <div className="sticky top-0 z-20 flex h-14 items-center bg-white/80 backdrop-blur-md px-4 border-b border-slate-200/80">
-                                <button
-                                    type="button"
-                                    aria-label="Expand sidebar"
-                                    onClick={() => setSidebarOpen(true)}
-                                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-xs hover:bg-slate-50 hover:text-primary transition-all"
-                                >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                    </svg>
-                                </button>
-                            </div>
+                            <button
+                                type="button"
+                                aria-label="Expand sidebar"
+                                onClick={() => setSidebarOpen(true)}
+                                className="fixed top-4 left-4 z-30 flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white/90 text-slate-600 shadow-md backdrop-blur-md transition-all hover:bg-slate-50 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            </button>
                         )}
 
-                        {/* Page Body Viewport */}
-                        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+                        {/* Page Body Viewport: Ditambahkan transisi padding kiri agar tombol tidak menabrak konten di layar desktop */}
+                        <main className={`flex-1 p-4 sm:p-6 lg:p-8 transition-all duration-200 ${!sidebarOpen ? 'lg:pl-16' : ''}`}>
                             <div className="mx-auto max-w-7xl">
                                 {children}
                             </div>
