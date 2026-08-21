@@ -56,7 +56,7 @@ services:
       app:
         condition: service_started
     ports:
-      - "8080:8080"
+      - "8070:8070"
     volumes:
       - app_storage_prod:/var/www/html/storage
       - app_bootstrap_cache_prod:/var/www/html/bootstrap/cache
